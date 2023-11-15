@@ -1,6 +1,6 @@
 ---
 layout: post
-title: You're up and running!
+title: Hello Wrold!
 ---
 
-Hello World!
+I will share my Machine Learning/Deep Learning here!
