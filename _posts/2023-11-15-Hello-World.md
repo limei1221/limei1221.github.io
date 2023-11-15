@@ -3,4 +3,4 @@ layout: post
 title: Hello Wrold!
 ---
 
-I will share my Machine Learning/Deep Learning here!
+I will share my Machine Learning/Deep Learning journey here!
