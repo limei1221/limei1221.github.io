@@ -6,11 +6,10 @@ permalink: /about/
 
 I'm a Machine Learning Engineer currently based in Suzhou, China.
 
-{% comment %} 
-### More Information
+### Interests
 
-A place to include any other types of information that you'd like to include about yourself.
-{% endcomment %}
+* Text-to-Speech
+* Talking Avatar
 
 ### Contact me
 
