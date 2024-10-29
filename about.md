@@ -4,7 +4,7 @@ title: About
 permalink: /about/
 ---
 
-I'm a Machine Learning Engineer currently based in Suzhou, China.
+I'm a Machine Learning Engineer.
 
 ### Interests
 
