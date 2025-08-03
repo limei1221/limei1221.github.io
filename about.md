@@ -14,7 +14,7 @@ Background Noise Distortion and Speaker Similarity](https://www.isca-archive.org
 
 
 ### Education
-* Master's degree, [Northwestern Polytechnical University](https://en.wikipedia.org/wiki/Northwestern_Polytechnical_University)
+* Master's Degree, [Northwestern Polytechnical University](https://en.wikipedia.org/wiki/Northwestern_Polytechnical_University)
 * Bachelor’s Degree, [Dalian University of Technology](https://en.wikipedia.org/wiki/Dalian_University_of_Technology)
 
 ### Contact me
