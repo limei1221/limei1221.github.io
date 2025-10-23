@@ -1,6 +1,6 @@
 ---
 layout: post
-title: Understanding Speculative Decoding
+title: Faster LLM Inference with Speculative Decoding
 ---
 
 Speculative Decoding is a latency reduction technique for large language model (LLM) inference.
