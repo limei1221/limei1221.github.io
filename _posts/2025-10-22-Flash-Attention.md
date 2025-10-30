@@ -150,13 +150,17 @@ We tweak the FlashAttention algorithm to reduce non‑matmul FLOPs, because mode
 
 FlashAttention-2 makes two minor tweaks to the online softmax trick (Section 3.1.3) to reduce non‑matmul FLOPs:
 1. We do not need to rescale both terms of the output by $\text{diag}(\ell^{(2)})^{-1}$:
+
 $$
 \mathbf{O}^{(2)} = \text{diag}(\ell^{(2)}/\ell^{(1)})^{-1} e^{m^{(1)} - m^{(2)}} \mathbf{O}^{(1)} + \text{diag}(\ell^{(2)})^{-1} e^{\mathbf{S}^{(2)} - m^{(2)}} \mathbf{V}^{(2)}
 $$
+
 Instead, we can maintain an unscaled version of $\mathbf{O}^{(2)}$:
+
 $$
 \tilde{\mathbf{O}}^{(2)} = \text{diag}(\ell^{(1)}) e^{m^{(1)} - m^{(2)}} \mathbf{O}^{(1)} + e^{\mathbf{S}^{(2)} - m^{(2)}} \mathbf{V}^{(2)}
 $$
+
 Only at the end of the loop do we scale the final $\tilde{\mathbf{O}}^{(last)}$ by $\text{diag}(\ell^{(last)})^{-1}$ to obtain the correct output.
 
 2. We do not need to save both the max $m^{(j)}$ and the sum of exponentials $\ell^{(j)}$ for the backward pass; we only need the log‑sum‑exp $L^{(j)} = m^{(j)} + \log(\ell^{(j)})$.
