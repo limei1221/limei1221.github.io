@@ -188,17 +188,18 @@ $$
 
 ## Comparison
 Let $N$ be the sequence length, $d$ the head dimension, and $M$ the SRAM size with $d \le M \le Nd$.  
-We report FLOPs for full attention; causal attention uses roughly half.
-| Method             | Pass | FLOPs (dominant)               | Extra memory | HBM accesses           |
-| ---                | ---  | ---                            | ---          | ---                    |
-| Standard Attention | FWD  | $4N^2d$                        | $O(N^2)$     | $\Theta(Nd + N^2)$     |
-| Standard Attention | BWD  | $8N^2d(≈2×FWD)$                | $O(N^2)$     | $\Theta(Nd + N^2)$     |
-| FlashAttention-1   | FWD  | $4N^2d$                        | $O(N)$       | $\Theta(N^2d^2M^{-1})$ |
-| FlashAttention-1   | BWD  | $10N^2d(≈2.5×FWD)$             | $O(N)$       | $\Theta(N^2d^2M^{-1})$ |
-| FlashAttention-2   | FWD  | $4N^2d$ (fewer non‑matmul ops) | $O(N)$       | $\Theta(N^2d^2M^{-1})$ |
-| FlashAttention-2   | BWD  | $10N^2d$                       | $O(N)$       | $\Theta(N^2d^2M^{-1})$ |
+We report FLOPs for full attention; causal attention uses roughly half.  
 
-FlashAttention-2’s gains come from better parallelization (over sequence length as well as batch and heads) and fewer shared‑memory transfers, not a different I/O asymptotic.
+| Method                | FLOPs    | Extra memory | HBM accesses           |
+| ---                   | ---      | ---          | ---                    |
+| StandardAttention FWD | $4N^2d$  | $O(N^2)$     | $\Theta(Nd + N^2)$     |
+| StandardAttention BWD | $8N^2d$  | $O(N^2)$     | $\Theta(Nd + N^2)$     |
+| FlashAttention-1 FWD  | $4N^2d$  | $O(N)$       | $\Theta(N^2d^2M^{-1})$ |
+| FlashAttention-1 BWD  | $10N^2d$ | $O(N)$       | $\Theta(N^2d^2M^{-1})$ |
+| FlashAttention-2 FWD  | $4N^2d$  | $O(N)$       | $\Theta(N^2d^2M^{-1})$ |
+| FlashAttention-2 BWD  | $10N^2d$ | $O(N)$       | $\Theta(N^2d^2M^{-1})$ |
+
+FlashAttention-2 has fewer non-matmul ops. Also, its HBM access gains come from better parallelization (across sequence length, batch, and heads) and from fewer shared‑memory transfers, not different I/O asymptotics.
 
 
 ## References
