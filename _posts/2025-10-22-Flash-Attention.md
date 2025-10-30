@@ -207,7 +207,3 @@ FlashAttention-2 has fewer non-matmul ops. Also, its HBM access gains come from 
 - [FlashAttention-2: Faster Attention with Better Parallelism and Work Partitioning](https://arxiv.org/abs/2307.08691)
 - [Making Deep Learning Go Brrrr From First Principles](https://horace.io/brrr_intro.html)
 - [Flash Attention derived and coded from first principles with Triton (Python)](https://www.youtube.com/watch?v=zy8ChVd_oTM)
-<!-- - [Introducing Triton: Open-source GPU programming for neural networks](https://openai.com/index/triton/)
-- [Official Tutorials](https://triton-lang.org/main/getting-started/tutorials/index.html)
-- [Stanford CS336 Language Modeling from Scratch | Spring 2025 | Lecture 6: Kernels, Triton](https://www.youtube.com/watch?v=E8Mju53VB00)
-- [GPU MODE Lecture 14: Practitioners Guide to Triton](https://christianjmills.com/posts/cuda-mode-notes/lecture-014/) -->
