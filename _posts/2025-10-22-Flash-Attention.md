@@ -72,32 +72,55 @@ Here's the idea:
 
 #### 3.1.1 The Standard Softmax Function
 
-The softmax function converts a vector of numbers (called logits) into a probability distribution. The formula for a value $z_i$ in a vector $z$ is:
+Given a vector $\mathbf{x} \in \mathbb{R}^N$, the softmax is defined as:
 
 $$
-\text{softmax}(s)_i = \frac{e^{s_i}}{\sum_{j} e^{s_j}}
+\text{softmax}(x_i) = \frac{e^{x_i}}{\sum_{j} e^{x_j}}
 $$
 
-* **The Problem (Numerical Overflow):** If any of the $s_i$ values are large (e.g., 1000), the term $e^{1000}$ becomes an astronomically large number that computers cannot store, leading to overflow (`inf`).
+* **The Problem (Numerical Overflow):** If any of the $x_i$ values are large (e.g., 1000), the term $e^{1000}$ becomes an astronomically large number that computers cannot store, leading to overflow (`inf`).
 
 #### 3.1.2 The "Safe Softmax" Trick
-To solve the overflow problem, a common trick is to subtract the maximum value of the vector from every element *before* exponentiating. Let $m = \max(s)$.
+To solve the overflow problem, a common trick is to subtract the maximum value of the vector from every element *before* exponentiating. Let $m = \max(\mathbf{x})$.
 
 $$
-\text{softmax}(s)_i = \frac{e^{s_i - m}}{\sum_{j} e^{s_j - m}}
+\text{softmax}(x_i) = \frac{e^{x_i - m}}{\sum_{j} e^{x_j - m}}
 $$
 
 This is mathematically identical to the original formula but is "safe" because the largest exponent is now 0 ($e^0 = 1$), preventing any overflow.
 
-* **The New Problem (Memory Access):** This "safe" method is a **multi‑pass** algorithm. It requires:
-    1.  **Pass 1:** Iterate through the entire vector $s$ to find the maximum value, $m$.
-    2.  **Pass 2:** Iterate through the vector $s$ again to calculate the denominator (the sum $\sum_{j} e^{s_j - m}$).
-    3.  **Pass 3:** Iterate a third time to divide each $e^{s_i - m}$ by the denominator.
+```
+# Pesudocode for Safe Softmax
+m_0 = -inf
+for i in 1 to N:
+    m_i = max(m_(i - 1), x_i)
+l_0 = 0
+for j in 1 to N:
+    l_j = l_(j - 1) + e^(x_j - m_N)
+for k in 1 to N:
+    x_k = e^(x_k - m_N) / l_N
+```
 
-On modern GPUs, these repeated passes over memory are slow and inefficient.
+* **The New Problem (Memory Access):** This "safe" method is a **multi‑pass** algorithm. It requires 3 iterations over the entire vector $\mathbf{x}$. On modern GPUs, these repeated passes over memory are slow and inefficient.
 
 #### 3.1.3 Online Softmax
 **Online softmax** computes the same result while minimizing memory access by effectively fusing the passes.
+
+```
+# Pseudocode for Online Softmax
+m_0 = -inf
+l_0 = 0
+for i in 1 to N:
+    m_i = max(m_(i - 1), x_i)
+    l_i = e^(m_(i - 1) - m_i)*l_(i - 1) + e^(x_i - m_i)
+for k in 1 to N:
+    x_k = e^(x_k - m_N) / l_N
+```
+
+
+### 3.2 FlashAttention Forward Pass
+
+The example below shows how to efficiently compute Attention using the online softmax technique.
 
 For simplicity, consider just one row block of the attention matrix $S$, of the form $[\mathbf{S}^{(1)} \quad \mathbf{S}^{(2)}]$ for some matrices $\mathbf{S}^{(1)}, \mathbf{S}^{(2)} \in \mathbb{R}^{B_r \times B_c}$, where $B_r$ and $B_c$ are the row and column block sizes. We want to compute the softmax of this row block and multiply by the values, of the form $\begin{bmatrix}
 \mathbf{V}^{(1)} \\
@@ -128,8 +151,8 @@ m^{(2)} &= \text{max}(m^{(1)}, \text{rowmax}(\mathbf{S}^{(2)})) = m \\
 \end{aligned}
 $$
 
+One of our goals is to not store $O(N^2)$ intermediate values for the backward pass. The backward pass typically requires the matrices $\mathbf{S}, \mathbf{P} \in \mathbb{R}^{N \times N}$ to compute the gradients with respect to $\mathbf{Q}, \mathbf{K}, \mathbf{V}$. However, by storing the output $\mathbf{O}$ and the softmax normalization statistics $(m, \ell)$, we can recompute the attention matrix $\mathbf{S}$ and $\mathbf{P}$ easily in the backward pass from blocks of $\mathbf{Q}, \mathbf{K}, \mathbf{V}$ in SRAM.
 
-### 3.2 FlashAttention Forward Pass
 ![Algorithm 1 FLASHATTENTION](/images/post_2025_10_22_flashattn/algo_1_flashattention.png)
 
 <!-- Algorithm 1 returns $\mathbf{O}=\text{softmax}(\mathbf{Q}\mathbf{K}^{\top})\mathbf{V}$ with $O(N^2d)$ FLOPs and requires $O(N)$ additional memory beyond input and output.
@@ -148,7 +171,7 @@ Let $N$ be the sequence length, $d$ be the head dimension, and $M$ be size of SR
 ## 4. FlashAttention-2
 We tweak the FlashAttention algorithm to reduce non‑matmul FLOPs, because modern GPUs have specialized compute units (e.g., NVIDIA Tensor Cores) that make matmul much faster.
 
-FlashAttention-2 makes two minor tweaks to the online softmax trick (Section 3.1.3) to reduce non‑matmul FLOPs:
+FlashAttention-2 makes two minor tweaks to the online softmax trick (Section 3.2) to reduce non‑matmul FLOPs:
 1. We do not need to rescale both terms of the output by $\text{diag}(\ell^{(2)})^{-1}$:
 
     $$
@@ -163,9 +186,9 @@ FlashAttention-2 makes two minor tweaks to the online softmax trick (Section 3.1
 
     Only at the end of the loop do we scale the final $\tilde{\mathbf{O}}^{(last)}$ by $\text{diag}(\ell^{(last)})^{-1}$ to obtain the correct output.
 
-2. We do not need to save both the max $m^{(j)}$ and the sum of exponentials $\ell^{(j)}$ for the backward pass; we only need the log‑sum‑exp $L^{(j)} = m^{(j)} + \log(\ell^{(j)})$.
+2. We do not need to save both the max $m^{(j)}$ and the sum of exponentials $\ell^{(j)}$ for the backward pass; we only need the log‑sum‑exp $L^{(j)} = m^{(j)} + \log(\ell^{(j)})$ to recompute $\mathbf{P}$.
 
-In the simple case of two blocks in Section 3.1.3, the online softmax trick now becomes:
+In the simple case of two blocks in Section 3.2, the online softmax trick now becomes:
 
 $$
 \begin{aligned}
