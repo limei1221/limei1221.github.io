@@ -213,7 +213,7 @@ $$
 ![Algorithm 2 FLASHATTENTION-2 Backward Pass](/images/post_2025_10_22_flashattn/algo2_flashattention2_backward_pass.png)
 
 
-## Comparison
+## Conclusion
 Let $N$ be the sequence length, $d$ the head dimension, and $M$ the SRAM size with $d \le M \le Nd$.  
 We report FLOPs for full attention; causal attention uses roughly half.  
 
@@ -221,12 +221,14 @@ We report FLOPs for full attention; causal attention uses roughly half.
 | ---                | ---  | ---      | ---          | ---                    |
 | Standard Attention | FWD  | $4N^2d$  | $O(N^2)$     | $\Theta(Nd + N^2)$     |
 | Standard Attention | BWD  | $8N^2d$  | $O(N^2)$     | $\Theta(Nd + N^2)$     |
-| FlashAttention-1   | FWD  | $4N^2d$  | $O(N)$       | $\Theta(N^2d^2M^{-1})$ |
-| FlashAttention-1   | BWD  | $10N^2d$ | $O(N)$       | $\Theta(N^2d^2M^{-1})$ |
+| FlashAttention     | FWD  | $4N^2d$  | $O(N)$       | $\Theta(N^2d^2M^{-1})$ |
+| FlashAttention     | BWD  | $10N^2d$ | $O(N)$       | $\Theta(N^2d^2M^{-1})$ |
 | FlashAttention-2   | FWD  | $4N^2d$  | $O(N)$       | $\Theta(N^2d^2M^{-1})$ |
 | FlashAttention-2   | BWD  | $10N^2d$ | $O(N)$       | $\Theta(N^2d^2M^{-1})$ |
 
-FlashAttention-2 has fewer non-matmul ops. Also, its HBM access gains come from better parallelization (across sequence length, batch, and heads) and from fewer shared‑memory transfers, not different I/O asymptotics.
+Compare to FlashAttention, FlashAttention-2 has fewer non-matmul ops. Also, its HBM access gains come from better parallelization (across sequence length, batch, and heads) and from fewer shared‑memory transfers, not different I/O asymptotics.
+
+I strongly recommend to read the original paper [FlashAttention](https://arxiv.org/abs/2205.14135), [FlashAttention-2](https://arxiv.org/abs/2307.08691) and watch [Umar Jamil's youtube video ablout FlashAttention](https://www.youtube.com/watch?v=zy8ChVd_oTM) to understand it better and to see how to dervie the backward pass step-by-step.
 
 
 ## References
