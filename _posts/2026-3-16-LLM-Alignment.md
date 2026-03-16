@@ -1,6 +1,6 @@
 ---
 layout: post
-title: From PPO to GRPO: The Evolution of Alignment Algorithms in Large Language Models
+title: From PPO to GRPO - The Evolution of Alignment Algorithms in Large Language Models
 ---
 
 If you've been following the rapid progress of Large Language Models (LLMs), you know that pretraining is only part of the story. Predicting the next token gives us a powerful base model, but it does not automatically give us a model that is helpful, safe, or aligned with human preferences.
