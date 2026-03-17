@@ -23,7 +23,12 @@ RLHF usually refers to a post-training pipeline for aligning a pretrained langua
 * **Reward Modeling (RM):** train a reward model on human preference data so it can score candidate outputs.
 * **Reinforcement Learning (RL):** optimize the policy (the language model we want to align) so it produces outputs that achieve high reward while remaining close to a reference behavior.
 
-This is the broad pipeline popularized by **InstructGPT**. In practice, some people use the term "RLHF" more narrowly to refer only to the reward-modeling and RL stages. In this post, we will use the broader definition, because it makes it easier to compare PPO, DPO, and GRPO within one shared framework, even though DPO skips parts of the classic pipeline.
+This is the broad pipeline popularized by **InstructGPT** [[Ouyang et al., 2022]](https://arxiv.org/abs/2203.02155). The figure below (Figure 2 from the InstructGPT paper) illustrates the three steps concretely:
+
+![Figure 2 from the InstructGPT paper, showing the three-step RLHF pipeline: (1) supervised fine-tuning, (2) reward model training, and (3) PPO-based reinforcement learning.](/images/post_2026_3_16_llm_alignment/instructgpt_fig2.png)
+*Figure 2 from Ouyang et al. (2022): A diagram illustrating the three steps of InstructGPT — (1) supervised fine-tuning (SFT), (2) reward model training, and (3) reinforcement learning via PPO.*
+
+In practice, some people use the term "RLHF" more narrowly to refer only to the reward-modeling and RL stages. In this post, we will use the broader definition, because it makes it easier to compare PPO, DPO, and GRPO within one shared framework, even though DPO skips parts of the classic pipeline.
 
 At a high level, all three methods are trying to answer the same question:
 
@@ -117,7 +122,7 @@ If an action has positive advantage, PPO wants to make it more likely. But the c
 RLHF almost always includes a penalty to keep the trained policy close to a frozen reference model. At a high level, you can think of the total reward as something like
 
 $$
-r_{\text{total}}(q,o) \approx r_{\text{RM}}(q,o) - \beta \cdot \mathrm{KL}(\pi_\theta \,\|\, \pi_{ref})
+r_{\text{total}}(q,o) \approx r_{\text{RM}}(q,o) - \beta \cdot D_{\mathrm{KL}}(\pi_\theta \,\|\, \pi_{ref})
 $$
 
 Here, $q$ is the prompt, $o$ is the model's full generated response, and $r_{\text{RM}}(q,o)$ is the reward model score. The scalar reward used for RL is that score minus a KL penalty weighted by $\beta$.
@@ -293,7 +298,7 @@ r_{i,t}(\theta)\hat{A}_i,\;
 \mathrm{clip}(r_{i,t}(\theta),1-\epsilon,1+\epsilon)\hat{A}_i
 \right)
 -
-\beta \,\mathbb{D}_{KL}
+\beta \, D_{\mathrm{KL}}
 \right)
 \right]
 $$
@@ -303,7 +308,7 @@ and, as with PPO, we **maximize** this objective with respect to the policy para
 The KL term is often estimated as
 
 $$
-\mathbb{D}_{KL}
+D_{\mathrm{KL}}
 =
 \frac{\pi_{ref}}{\pi_\theta}
 -
