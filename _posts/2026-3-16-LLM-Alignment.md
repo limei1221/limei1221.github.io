@@ -9,7 +9,7 @@ That second part happens during **alignment**: the stage where a raw language mo
 
 For a long time, this space was dominated by **Reinforcement Learning from Human Feedback (RLHF)** using **PPO**. But as practitioners ran into the engineering complexity, instability, and memory overhead of PPO-based pipelines, the field began searching for simpler and more efficient alternatives. That search produced methods like **DPO** and **GRPO**, which take very different approaches and serve different use cases.
 
-In this post, we'll walk through the core ideas behind RLHF and then examine three important optimization approaches used in modern post-training: **PPO**, **DPO**, and **GRPO**. The goal is to keep the discussion self-contained while still giving enough mathematical intuition to understand why these methods differ, and why the field has gradually moved from one to the next.
+In this post, we'll walk through the core ideas behind RLHF and then examine three important optimization approaches used in modern post-training: **PPO**, **DPO**, and **GRPO**. The goal is to keep the discussion self-contained while still giving enough mathematical intuition to understand why these methods differ, and why different settings have motivated different choices over time.
 
 ---
 
@@ -21,15 +21,15 @@ RLHF usually refers to a post-training pipeline for aligning a pretrained langua
 
 * **Supervised Fine-Tuning (SFT):** train on demonstration prompt-response pairs so the model learns assistant-style behavior.
 * **Reward Modeling (RM):** train a reward model on human preference data so it can score candidate outputs.
-* **Reinforcement Learning (RL):** optimize the policy so it produces outputs that achieve high reward while remaining close to a reference behavior.
+* **Reinforcement Learning (RL):** optimize the policy (the language model we want to align) so it produces outputs that achieve high reward while remaining close to a reference behavior.
 
-This is the broad pipeline popularized by **InstructGPT**. In practice, some people use the term "RLHF" more narrowly to mean only the reward-modeling and RL stages, but in this post we will use it for the full three-stage setup.
+This is the broad pipeline popularized by **InstructGPT**. In practice, some people use the term "RLHF" more narrowly to mean only the reward-modeling and RL stages, but in this post we will use it for the full three-stage setup. We use the broad definition because it lets us compare all three methods (PPO, DPO, GRPO) as different solutions within the same post-training pipeline, even though DPO bypasses the stages that the narrow definition focuses on.
 
 The key point is that **PPO**, **DPO**, and **GRPO** are all different answers to the same question:
 
 > Once we have a model that can already behave like an assistant, how do we improve it further using preferences or reward signals?
 
-PPO answers that question with full reinforcement learning. DPO replaces the RL step with a direct preference objective. GRPO brings back RL-style exploration, but removes one of PPO's most expensive pieces.
+PPO answers that question with full reinforcement learning. DPO skips explicit reward modeling and full RL by directly optimizing the model on preference pairs so it favors preferred responses over dispreferred ones. GRPO brings back RL-style exploration, but removes one of PPO's most expensive pieces.
 
 ---
 
@@ -72,18 +72,21 @@ A useful analogy is this:
 
 ### The Math
 
+A key term before diving in: a **rollout** is a trajectory sampled from the current policy — for language models, a full generated response given a prompt. PPO (and GRPO later) repeatedly generate rollouts, score them with a reward signal, and update the policy based on those results. DPO, covered next, does not use rollouts, which is one of its defining simplifications.
+
 PPO uses the **advantage** to measure whether an action turned out better than expected:
 
 $$
 \hat{A}_t \approx R_t - V(s_t)
 $$
+where $R_t$ is the (discounted) return starting from time step $t$—intuitively, the total future reward the agent actually received after state $s_t$.
 
 In practice, many implementations use multi-step returns or Generalized Advantage Estimation (GAE), but this expression captures the main intuition: compare what actually happened to what the critic predicted.
 
-PPO then optimizes the clipped surrogate objective:
+PPO then optimizes (more specifically, maximizes) the clipped surrogate objective $J^{\text{CLIP}}(\theta)$:
 
 $$
-L^{\text{CLIP}}(\theta)=\mathbb{E}\left[\min\left(r_t(\theta)\hat{A}_t,\;\text{clip}(r_t(\theta),1-\epsilon,1+\epsilon)\hat{A}_t\right)\right]
+J^{\text{CLIP}}(\theta)=\mathbb{E}\left[\min\left(r_t(\theta)\hat{A}_t,\;\text{clip}(r_t(\theta),1-\epsilon,1+\epsilon)\hat{A}_t\right)\right]
 $$
 
 where
@@ -92,7 +95,7 @@ $$
 r_t(\theta)=\frac{\pi_\theta(a_t|s_t)}{\pi_{\theta_{\text{old}}}(a_t|s_t)}
 $$
 
-is the probability ratio between the new policy and the old one.
+is the probability ratio between the new policy and the old one, where $s_t$ is the state at time step $t$ (for language models, the prompt plus all tokens generated so far) and $a_t$ is the action taken at that step (typically, the next token the model chooses to output). Here, $\pi_{\theta_{\text{old}}}$ is specifically the **behavior policy** that was used to generate the data in the current batch of trajectories; it is held fixed while we optimize $\pi_\theta$, and it appears only to perform importance sampling of the new policy relative to the policy that actually produced the samples.
 
 If an action has positive advantage, PPO wants to make it more likely. But the clipping term prevents the probability ratio from moving too far in one update. This is the core stabilizing mechanism.
 
@@ -104,7 +107,11 @@ $$
 r_{\text{total}}(x,y) \approx r_{\text{RM}}(x,y) - \beta \cdot \mathrm{KL}(\pi_\theta \,\|\, \pi_{ref})
 $$
 
+Here, $x$ is the input prompt, $y$ is the model's full generated response, and $r_{\text{total}}(x,y)$ is the scalar reward used for the RL update: the reward model score $r_{\text{RM}}(x,y)$ for $(x,y)$ minus a KL penalty weighted by $\beta$.
+
 This is a useful **schematic** view, but it is not always the exact literal implementation. In practice, many RLHF systems apply the KL penalty more locally, often as a **per-token penalty** relative to the reference or SFT model.
+
+Conceptually, the pipeline looks like this: for each prompt–response pair $(x,y)$, you first construct a single scalar reward $r_{\text{total}}(x,y)$ (including the KL penalty); that scalar reward is then turned into returns $R_t$ and advantages $\hat{A}_t \approx R_t - V(s_t)$ along the trajectory; finally, those advantages $\hat{A}_t$ are what appear inside the PPO clipped surrogate objective $J^{\text{CLIP}}(\theta)$ together with the probability ratio $r_t(\theta)$ to produce the actual policy update.
 
 ### Why PPO Was So Important — and Why It’s Expensive
 
@@ -137,12 +144,12 @@ This does **not** mean DPO is just ordinary supervised fine-tuning. It is still 
 
 ### The Math
 
-Suppose that for prompt $x$, humans prefer response $y_w$ over response $y_l$. DPO optimizes
+Suppose that for prompt $x$, humans prefer response $y_w$ over response $y_l$. Conceptually, DPO **maximizes** a preference objective
 
 $$
-L_{\text{DPO}}(\pi_\theta;\pi_{ref})
+J_{\text{DPO}}(\pi_\theta;\pi_{ref})
 =
--\mathbb{E}_{(x,y_w,y_l)\sim\mathcal{D}}
+\mathbb{E}_{(x,y_w,y_l)\sim\mathcal{D}}
 \left[
 \log \sigma \left(
 \beta \log \frac{\pi_\theta(y_w|x)}{\pi_{ref}(y_w|x)}
@@ -157,10 +164,12 @@ where:
 * $x$ is the prompt,
 * $y_w$ is the preferred response,
 * $y_l$ is the dispreferred response,
+* $(x, y_w, y_l) \sim \mathcal{D}$ are sampled from a dataset of human preference triples (prompt, preferred response, dispreferred response),
 * $\sigma$ is the sigmoid function,
 * $\beta$ controls the strength of regularization toward the reference model.
 
 The interpretation is straightforward: the model is pushed to assign relatively higher probability to the preferred answer than to the rejected answer, measured against the frozen reference model.
+In most implementations this is written as **minimizing a loss** $L_{\text{DPO}} = -J_{\text{DPO}}$, but it is mathematically equivalent to the maximization view above and keeps the objective-sign convention consistent with PPO and GRPO.
 
 ### Why DPO Took Off
 
@@ -202,21 +211,15 @@ The main systems innovation of GRPO is simple:
 
 Instead of training a value model to estimate expected return, GRPO samples a **group** of responses for the same prompt and scores them all. Each response is then judged relative to the others in its group.
 
-So for prompt $q$, the policy samples
+So for prompt $x$, the policy samples
 
 $$
-\{o_1, o_2, \dots, o_G\}
+\{y_1, y_2, \dots, y_G\}
 $$
 
 and each output receives a reward.
 
-That reward can come from:
-
-* a learned reward model,
-* a rule-based verifier,
-* a code execution result,
-* a math checker,
-* or some combination of these.
+That reward can come from a learned reward model or another evaluation signal defined for the task. In DeepSeekMath, the discussion is framed in terms of outcome- and process-level supervision for mathematical reasoning; in broader modern reasoning systems, people also use rule-based verifiers such as math checkers or code execution.
 
 This point matters because GRPO is often described too loosely. It is **critic-free**, but it is **not reward-free**.
 
@@ -236,7 +239,7 @@ $$
 
 This gives a simple interpretation:
 
-* if a sampled answer is better than the other answers in its group, it gets positive advantage;
+* if a sampled answer is better than the average answer in its group, it gets positive advantage;
 * if it is worse, it gets negative advantage.
 
 That means GRPO does not need a separate learned value function to say what was "better than expected." The group itself provides the baseline.
@@ -245,25 +248,25 @@ That means GRPO does not need a separate learned value function to say what was 
 
 Even when the reward is assigned at the sequence level, the model is still autoregressive, so optimization happens token by token.
 
-Define the token-level policy ratio as
+Define the token-level policy ratio as, where $x$ is the prompt, $y_i$ is the $i$‑th sampled output sequence for that prompt, and $r_{i,t}(\theta)$ is the PPO-style probability ratio for the token at position $t$ in that sequence:
 
 $$
 r_{i,t}(\theta)
 =
-\frac{\pi_\theta(o_{i,t}\mid q, o_{i,<t})}
-{\pi_{\theta_{\text{old}}}(o_{i,t}\mid q, o_{i,<t})}
+\frac{\pi_\theta(y_{i,t}\mid x, y_{i,<t})}
+{\pi_{\theta_{\text{old}}}(y_{i,t}\mid x, y_{i,<t})}
 $$
 
-Then a GRPO-style objective can be written as
+Then a GRPO-style objective can be written as, and as with PPO, we **maximize** this objective $J_{\text{GRPO}}(\theta)$ with respect to the policy parameters $\theta$:
 
 $$
-L_{\text{GRPO}}(\theta)
+J_{\text{GRPO}}(\theta)
 =
 \mathbb{E}\left[
 \frac{1}{G}
 \sum_{i=1}^{G}
-\frac{1}{|o_i|}
-\sum_{t=1}^{|o_i|}
+\frac{1}{|y_i|}
+\sum_{t=1}^{|y_i|}
 \left(
 \min\left(
 r_{i,t}(\theta)\hat{A}_i,\;
@@ -287,14 +290,14 @@ $$
 1
 $$
 
-A note on the KL term: in the original DeepSeekMath formulation, the KL penalty is incorporated as a **per-token penalty into the reward signal** during rollout, and then the penalized reward flows into the policy gradient update. The presentation above — subtracting it directly inside the objective — is a common equivalent way to write it, but the precise location of the KL in the implementation matters for understanding how the penalty is computed in practice.
+A note on the KL term: in InstructGPT-style PPO, the KL penalty is often incorporated as a **per-token penalty in the reward signal** during rollout. In the original DeepSeekMath formulation of GRPO, by contrast, the KL regularizer is added **directly to the objective/loss** rather than folded into the reward. The presentation above therefore matches the GRPO paper more closely than a reward-penalty interpretation would. Also note that $\pi_{ref}$ here plays a different role from $\pi_{\theta_{\text{old}}}$: $\pi_{\theta_{\text{old}}}$ is the changing behavior policy that generated the data and appears only in the importance-sampling ratio $r_{i,t}(\theta)$, whereas $\pi_{ref}$ is typically a **fixed reference model** (e.g. a frozen SFT checkpoint) that serves as an anchor for the KL regularization term.
 
 There are two more details worth emphasizing.
 
 First, the factor
 
 $$
-\frac{1}{|o_i|}
+\frac{1}{|y_i|}
 $$
 
 means the objective includes **length normalization** over each sampled sequence. That is part of the original GRPO formulation and is easy to miss.
@@ -351,6 +354,11 @@ GRPO says: if you still want exploration and rollout-based learning, you may be 
 * **DPO** turns preference optimization into a direct pairwise objective, avoiding an explicit RL loop.
 * **GRPO** is a critic-free RL method that estimates advantage relative to a group of sampled outputs, while still relying on reward signals such as reward models or verifiers.
 
-The evolution from PPO to DPO to GRPO reflects a broader pattern in AI: not abandoning alignment or reinforcement learning, but **re-engineering them to be cheaper, more stable, and better matched to the structure of the task**.
+The move from PPO toward alternatives such as DPO and GRPO reflects a broader pattern in AI: not abandoning alignment or reinforcement learning, but **re-engineering them to be cheaper, more stable, and better matched to the structure of the task**.
 
 As language models move from general chat toward deeper reasoning, tool use, and verifiable problem solving, the algorithms used in post-training are becoming more specialized. And that shift is likely to continue: the future of alignment may not belong to one universal algorithm, but to a family of methods tuned to different kinds of feedback, different kinds of supervision, and different kinds of capability.
+
+<p style="text-align: center; font-style: italic;">
+  ⭐️ If you find this post helpful, please consider starring the
+  <a href="https://github.com/limei1221/limei1221.github.io">source code for this blog</a>. ⭐️
+</p>
