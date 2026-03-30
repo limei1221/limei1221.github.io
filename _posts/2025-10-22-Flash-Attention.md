@@ -1,6 +1,7 @@
 ---
 layout: post
 comments: true
+mathjax: true
 title: "Understanding Flash Attention"
 excerpt: "A deep dive into Flash Attention, an IO-aware exact attention algorithm that reduces memory reads/writes by computing attention in tiles without materializing the full attention matrix in HBM."
 date: 2025-10-22

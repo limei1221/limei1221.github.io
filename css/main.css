@@ -185,6 +185,8 @@ a:visited { color: #205caa; }
 
 .post-content > * { margin: 20px 0; }
 
+.post-content img { max-width: 100%; height: auto; display: block; margin: 20px auto; }
+
 
 .post-content h1,
 .post-content h2,

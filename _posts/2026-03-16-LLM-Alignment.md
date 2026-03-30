@@ -1,6 +1,7 @@
 ---
 layout: post
 comments: true
+mathjax: true
 title: "From PPO to GRPO - The Evolution of Alignment Algorithms in Large Language Models"
 excerpt: "An exploration of LLM alignment techniques — from RLHF with PPO to the more efficient DPO and GRPO — explaining the mathematical intuition behind each method and why the field moved beyond PPO-based pipelines."
 date: 2026-03-16

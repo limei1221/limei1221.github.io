@@ -1,6 +1,7 @@
 ---
 layout: post
 comments: true
+mathjax: true
 title: "Faster LLM Inference with Speculative Decoding"
 excerpt: "Speculative Decoding is a latency reduction technique for LLM inference that uses a small draft model to propose candidate tokens, then verifies them in parallel with the large target model to reduce expensive forward passes."
 date: 2025-08-18

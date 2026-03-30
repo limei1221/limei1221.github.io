@@ -9,9 +9,9 @@ I’m a Machine Learning Engineer with 7+ years of experience (including time at
 
 [LinkedIn](https://www.linkedin.com/in/limei1221/) / [YouTube](https://www.youtube.com/@meili-ai)
 
-<img src="/images/avatar_half.jpg" alt="Mei Li" style="width: 200px;" /> 
+<img src="/images/avatar_half.jpg" alt="Mei Li" style="width: 400px;" /> 
 
-### Publications‌
+<!-- ### Publications‌
 * [iEmoTTS: Toward Robust Cross-Speaker Emotion Transfer and Control for Speech Synthesis based on Disentanglement between Prosody and Timbre](https://arxiv.org/abs/2206.14866)
 * [An Automatic Voice Conversion Evaluation Strategy Based on Perceptual Background Noise Distortion and Speaker Similarity](https://www.isca-archive.org/ssw_2016/huang16_ssw.html)
-* [On the impact of phoneme alignment in DNN-based speech synthesis](https://www.isca-archive.org/ssw_2016/li16_ssw.html)
+* [On the impact of phoneme alignment in DNN-based speech synthesis](https://www.isca-archive.org/ssw_2016/li16_ssw.html) -->

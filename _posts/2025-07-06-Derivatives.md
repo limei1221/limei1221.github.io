@@ -1,6 +1,7 @@
 ---
 layout: post
 comments: true
+mathjax: true
 title: "Derivatives, Gradients, and Jacobians Explained"
 excerpt: "A concise breakdown of derivatives, gradients, and Jacobians — three names for the same core concept of measuring how a function's output changes with its input, differing only in the dimensionality of the function."
 date: 2025-07-06
