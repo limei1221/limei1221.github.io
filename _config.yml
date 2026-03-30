@@ -1,11 +1,11 @@
 # Site settings
-title: Andrej Karpathy blog
+title: Mei Li's Blog
 email: 
-description: "Musings of a Computer Scientist."
+description: "仰望星空 脚踏实地"
 baseurl: ""
-url: "http://karpathy.github.io"
-twitter_username: karpathy
-github_username:  karpathy
+url: "http://limei1221.github.io"
+twitter_username: limei1221
+github_username:  limei1221
 
 # Build settings
 markdown: kramdown
