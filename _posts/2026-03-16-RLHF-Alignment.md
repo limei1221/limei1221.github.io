@@ -2,7 +2,7 @@
 layout: post
 comments: true
 mathjax: true
-title: "From PPO to GRPO - The Evolution of Alignment Algorithms in Large Language Models"
+title: "From PPO to GRPO: The Evolution of Alignment Algorithms in Large Language Models"
 excerpt: "An exploration of LLM alignment techniques — from RLHF with PPO to the more efficient DPO and GRPO — explaining the mathematical intuition behind each method and why the field moved beyond PPO-based pipelines."
 date: 2026-03-16
 ---
@@ -394,7 +394,13 @@ The shift from PPO toward methods like DPO and GRPO reflects a broader pattern i
 
 As language models move from general chat toward deeper reasoning, tool use, and verifiable problem solving, post-training algorithms are becoming more specialized. That trend is likely to continue. The future of alignment may not belong to one universal algorithm, but to a family of methods tuned to different kinds of feedback, supervision, and capability.
 
-<p style="text-align: center; font-style: italic;">
+<!-- <p style="text-align: center; font-style: italic;">
   ⭐️ If you find this post helpful, please consider starring the
   <a href="https://github.com/limei1221/limei1221.github.io">source code for this blog</a>. ⭐️
-</p>
+</p> -->
+
+## References
+- [InstructGPT: Training language models to follow instructions with human feedback (Ouyang et al., 2022)](https://arxiv.org/abs/2203.02155)
+- [Proximal Policy Optimization Algorithms (Schulman et al., 2017)](https://arxiv.org/abs/1707.06347)
+- [Direct Preference Optimization: Your Language Model is Secretly a Reward Model (Rafailov et al., 2023)](https://arxiv.org/abs/2305.18290)
+- [DeepSeekMath: Pushing the Limits of Mathematical Reasoning in Open Language Models (Shao et al., 2024)](https://arxiv.org/abs/2402.03300)
