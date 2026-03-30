@@ -2,6 +2,7 @@
 layout: page
 title: About
 permalink: /about/
+includelink: true
 ---
 
 Hi! I'm Mei Li, a Machine Learning Engineer from Shaanxi, China.
