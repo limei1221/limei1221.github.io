@@ -146,6 +146,9 @@ $$
 
 So instead of inheriting a uniform sum, layer $l$ forms a learned weighted combination of the embedding and all previous layer outputs.
 
+![Full Attention Residuals](/images/post_2026_03_30_attention_residuals/full-attention-residuals.png)
+*Source: [Substack](https://substack-post-media.s3.amazonaws.com/public/images/f88f4ec9-f568-450f-8618-9742309bd373_1560x786.png)*
+
 A nice detail is that the query is just one learned vector per layer. This is not a giant new self-attention module over depth. It is a lightweight depth-mixing mechanism, with RMS normalization on the keys so the softmax is not dominated by raw activation scale.
 
 The adaptivity is also worth describing precisely. The query is static for the layer, but the keys and values come from token-dependent earlier sources. So the effective mixing weights are still input-dependent even though the layer does not build a fresh query from the current hidden state.
@@ -192,6 +195,9 @@ Recent local computation is represented at finer granularity through the running
 
 ### A toy example
 
+![Block Attention Residuals](/images/post_2026_03_30_attention_residuals/block-attention-residuals.png)
+*Source: [Gemini](https://gemini.google.com/share/525f52183b52)*
+
 Suppose the network has 8 layers and we divide them into 2 depth blocks:
 
 - Block 1: layers 1–4
@@ -232,15 +238,13 @@ Let:
 - $L$: number of layers (each attention or MLP counts as one)
 - $N$: number of depth blocks in Block AttnRes
 
-For a standard decoder with GQA, the token-attention backbone is unchanged by AttnRes. During training or prefilling, the dominant token-attention cost is still the usual quadratic attention term $O(T^2 d)$. During autoregressive decoding, per-token attention work is still linear in context length because of the KV cache. GQA changes token-attention efficiency by reducing KV storage and bandwidth; it does not change how residual information is mixed across depth.
-
-All complexity statements below refer to the **total additional depth-mixing cost across the full depth stack**, not the cost of a single layer.
+The token-attention backbone is unchanged by AttnRes. All complexity statements below refer to the **total additional depth-mixing cost across the full depth stack**, not the cost of a single layer.
 
 ### Extra overhead from the residual scheme
 
 | Method | What each layer can read from depth | Extra depth-mixing compute | Extra depth-state memory | Typical structure |
 |---|---|---:|---:|---|
-| Standard residuals + GQA | only the current running hidden state | $O(Ld)$ | $O(d)$ | ordinary decoder stack |
+| Standard residuals | only the current running hidden state | $O(Ld)$ | $O(d)$ | ordinary decoder stack |
 | Full Attention Residuals | embedding + all previous layer outputs | $O(L^2 d)$ | $O(Ld)$ | 32 decoder blocks $\approx L=64$ layers |
 | Block Attention Residuals | embedding + previous block summaries + current block partial summary | $O(LNd)$ | $O(Nd)$ | same decoder, grouped into $N$ depth blocks |
 | `parameter-golf`-style skips | current hidden state + original embedding + fixed long skips | $O(Ld)$ | $O(Ld)$ | embedding reinjection + mirrored skips |
@@ -266,9 +270,7 @@ The paper’s empirical message is stronger than “here is an interesting mecha
 3. the block variant is practical enough to serve as a drop-in replacement with minimal overhead, and
 4. integrating AttnRes into Kimi Linear improves output-magnitude and gradient uniformity across depth and improves downstream performance across evaluated tasks.
 
-The paper also reports a large-scale Kimi Linear run at 48B total parameters with 3B activated parameters, pre-trained on 1.4T tokens.
-
-That matters because it moves AttnRes out of the category of “nice small-model trick” and into the category of “something the authors actually scaled.”
+The paper also reports a large-scale Kimi Linear run at 48B total parameters with 3B activated parameters, pre-trained on 1.4T tokens. That matters because it moves AttnRes out of the category of “nice small-model trick” and into the category of “something the authors actually scaled.”
 
 ---
 
