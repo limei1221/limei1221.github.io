@@ -18,6 +18,7 @@ The [Attention Residuals](https://arxiv.org/abs/2603.15031) paper asks a simple 
 That is the idea of the paper in one line: **standard residuals treat depth like a pipe; Attention Residuals treats depth like memory.**
 
 ![Overview of Attention Residuals](/images/post_2026_03_30_attention_residuals/attention-residuals.png)
+*Source: [X](https://x.com/i/status/2037010118957817988)*
 
 One notation detail matters for the rest of the discussion. The paper counts each attention sublayer and each MLP or MoE sublayer as a separate “layer.” So a decoder with 32 Transformer blocks is treated as roughly $L = 64$ in the formulas.
 
