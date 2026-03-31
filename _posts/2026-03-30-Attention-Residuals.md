@@ -13,7 +13,7 @@ We usually describe residuals as a gradient highway, and that is true. But resid
 
 That mixing rule is fixed, blind, and uniform.
 
-The [Attention Residuals](https://arxiv.org/abs/2603.15031) paper asks a simple question: what if depth worked more like retrieval and less like accumulation? Instead of forcing each layer to inherit one hard-coded running state, let it choose which earlier computations it wants to build on.
+The [Attention Residuals](https://arxiv.org/abs/2603.15031) paper asks a simple question: what if depth worked more like retrieval and less like accumulation? Instead of forcing each layer to inherit one hard-coded running state, let it score earlier depth sources against a learned layer-specific retrieval vector and combine them with learned, input-dependent weights.
 
 That is the idea of the paper in one line: **standard residuals treat depth like a pipe; Attention Residuals treats depth like memory.**
 
@@ -25,7 +25,7 @@ One notation detail matters for the rest of the discussion. The paper counts eac
 
 ## TL;DR
 
-**Standard residuals** implicitly merge all earlier computations with fixed, uniform coefficients. **Attention Residuals** replaces that fixed rule with learned retrieval over earlier layer outputs. The full version lets each layer attend over the entire depth history; the block version compresses old history into summaries and keeps the idea practical.
+**Standard residuals** implicitly merge all earlier computations with fixed, uniform coefficients. **Attention Residuals** replaces that fixed rule with learned retrieval over earlier layer outputs. The full version lets each layer mix over the entire depth history; the block version compresses old history into block summaries and keeps the idea practical.
 
 ---
 
@@ -49,9 +49,9 @@ This is the hidden policy inside a residual stack: every earlier contribution is
 
 That is why residuals are not only an optimization trick. They are also a specific rule for mixing information across depth.
 
-The paper’s motivation is that this rule is too rigid. Different sublayers may want different mixtures of earlier computation. An attention sublayer may benefit from access to a representation that still preserves token identity. An MLP may prefer a later semantic abstraction. Standard residuals force both to consume the same compressed state.
+The paper’s motivation is that this rule is too rigid. Different layers may want different mixtures of earlier computation. An attention layer may benefit from access to a representation that still preserves token identity. An MLP layer may prefer a later semantic abstraction. Standard residuals force both to consume the same compressed state.
 
-A useful mental model is the analogy to sequence modeling. Recurrence compresses token history into one running state; self-attention replaces that compression with content-dependent retrieval over earlier tokens. Attention Residuals makes the same conceptual move over **depth** rather than **time**.
+A useful mental model is the analogy to sequence modeling. Recurrence compresses token history into one running state; self-attention replaces that compression with retrieval over earlier tokens. Attention Residuals makes a similar conceptual move over **depth** rather than **time**.
 
 ---
 
@@ -69,7 +69,9 @@ it says:
 
 > Here are the earlier computations. Decide which ones matter now.
 
-That framing is what makes the method feel natural rather than exotic. Once you view residual streams as a memory system over depth, attention over depth looks like the obvious generalization.
+That framing is what makes the method feel natural rather than exotic. Once you view residual streams as a memory system over depth, attention over depth looks like a natural generalization.
+
+One nuance is important up front: this is not ordinary self-attention over depth where the current hidden state produces a token-conditioned query. In AttnRes, the query for layer $l$ is a learned layer-specific vector. The weights are still input-dependent because that vector is matched against token-dependent earlier sources, but the query itself is static for that layer.
 
 ---
 
@@ -146,7 +148,9 @@ So instead of inheriting a uniform sum, layer $l$ forms a learned weighted combi
 
 A nice detail is that the query is just one learned vector per layer. This is not a giant new self-attention module over depth. It is a lightweight depth-mixing mechanism, with RMS normalization on the keys so the softmax is not dominated by raw activation scale.
 
-Conceptually, Full AttnRes is the depth analogue of softmax attention. Standard residual accumulation behaves more like a fixed recurrence over depth; Full AttnRes upgrades that recurrence into retrieval.
+The adaptivity is also worth describing precisely. The query is static for the layer, but the keys and values come from token-dependent earlier sources. So the effective mixing weights are still input-dependent even though the layer does not build a fresh query from the current hidden state.
+
+Conceptually, Full AttnRes is the depth analogue of softmax retrieval. Standard residual accumulation behaves more like a fixed recurrence over depth; Full AttnRes upgrades that recurrence into selective readout over earlier depth locations.
 
 ### Why this is appealing
 
@@ -162,7 +166,7 @@ It can keep nontrivial access to the embedding, and it can occasionally jump to 
 
 The downside is straightforward: you must keep all earlier depth sources available.
 
-That leads to extra depth-mixing cost on the order of $O(L^2 d)$ per token, and depth-state storage on the order of $O(Ld)$. In ordinary training this may be acceptable because activations are already retained for backpropagation, but it becomes more painful when activation recomputation, pipeline parallelism, or large-scale systems constraints matter.
+That leads to extra depth-mixing cost on the order of $O(L^2 d)$ per token across the full depth stack, and depth-state storage on the order of $O(Ld)$. In ordinary training this may be acceptable because activations are already retained for backpropagation, but it becomes more painful when activation recomputation, pipeline parallelism, or large-scale systems constraints matter.
 
 That is what motivates the block version.
 
@@ -172,23 +176,23 @@ That is what motivates the block version.
 
 Block Attention Residuals is the practical version of the idea.
 
-Instead of storing every earlier layer output separately, the network groups layers into $N$ depth blocks. Older history is compressed into one summary per block, while recent history inside the current block stays uncompressed.
+Instead of storing every earlier layer output separately, the network groups layers into $N$ depth blocks. Older history is compressed into one summary per completed block. Inside the current block, it keeps an evolving partial block summary.
 
 So when a layer computes its residual input, it attends over three types of sources:
 
 1. the embedding,
 2. the summaries of completed earlier blocks, and
-3. the running partial sum inside the current block.
+3. the running partial summary inside the current block.
 
 This is a very natural compromise.
 
-Recent local computation stays sharp. Old history is compressed. The embedding remains a first-class source throughout. That matches the intuition that most layers mainly care about nearby computation, but still benefit from occasional access to much older regions of the network.
+Recent local computation is represented at finer granularity through the running partial sum. Old history is compressed to one summary per completed block. The embedding remains a first-class source throughout. That matches the intuition that most layers mainly care about nearby computation, but still benefit from occasional access to much older regions of the network.
 
 ![PyTorch-style pseudo code for Block Attention Residuals](/images/post_2026_03_30_attention_residuals/pseudo_code_block_attention_residuals.png)
 
 ### A toy example
 
-Suppose the network has 8 sublayers and we divide them into 2 depth blocks:
+Suppose the network has 8 layers and we divide them into 2 depth blocks:
 
 - Block 1: layers 1–4
 - Block 2: layers 5–8
@@ -199,9 +203,7 @@ When layer 7 runs, it does **not** need to read the outputs of layers 1, 2, 3, a
 - a single summary representing Block 1, and
 - the partial block summary accumulated so far within Block 2 (up to layer 6).
 
-So the model keeps detailed access to recent depth and compressed access to older depth.
-
-That is exactly the systems tradeoff you would want.
+So the model keeps compressed access to older depth and a finer-grained running summary for recent depth. That is the systems tradeoff the method is aiming for.
 
 ### Why the block version matters
 
@@ -212,7 +214,7 @@ Block Attention Residuals gives a clean continuum:
 
 The paper reports that relatively small numbers of blocks recover most of the gains. That suggests full per-layer depth resolution is not necessary to get most of the benefit.
 
-This is also the version that makes the idea practical in a real system. The paper describes implementation work for pipeline parallelism, including cross-stage caching, and a two-phase inference strategy that separates inter-block attention from sequential intra-block accumulation before merging them with online softmax. That is the difference between “nice architectural idea” and “something you might actually deploy.”
+This is also the version that makes the idea practical in a real system. The paper describes implementation work for pipeline parallelism, including cross-stage caching and a two-phase inference strategy that separates inter-block attention from sequential intra-block accumulation before merging them with online softmax. That is the difference between “nice architectural idea” and “something you might actually deploy.”
 
 ---
 
@@ -227,18 +229,20 @@ Let:
 
 - $T$: sequence length
 - $d$: model width
-- $L$: number of sublayers in the paper’s sense
+- $L$: number of layers (each attention or MLP counts as one)
 - $N$: number of depth blocks in Block AttnRes
 
 For a standard decoder with GQA, the token-attention backbone is unchanged by AttnRes. During training or prefilling, the dominant token-attention cost is still the usual quadratic attention term $O(T^2 d)$. During autoregressive decoding, per-token attention work is still linear in context length because of the KV cache. GQA changes token-attention efficiency by reducing KV storage and bandwidth; it does not change how residual information is mixed across depth.
+
+All complexity statements below refer to the **total additional depth-mixing cost across the full depth stack**, not the cost of a single layer.
 
 ### Extra overhead from the residual scheme
 
 | Method | What each layer can read from depth | Extra depth-mixing compute | Extra depth-state memory | Typical structure |
 |---|---|---:|---:|---|
 | Standard residuals + GQA | only the current running hidden state | $O(Ld)$ | $O(d)$ | ordinary decoder stack |
-| Full Attention Residuals | embedding + all previous sublayer outputs | $O(L^2 d)$ | $O(Ld)$ | 32 decoder blocks $\approx L=64$ sublayers |
-| Block Attention Residuals | embedding + previous block summaries + current block partial sum | $O(LNd)$ | $O(Nd)$ | same decoder, grouped into $N$ depth blocks |
+| Full Attention Residuals | embedding + all previous layer outputs | $O(L^2 d)$ | $O(Ld)$ | 32 decoder blocks $\approx L=64$ layers |
+| Block Attention Residuals | embedding + previous block summaries + current block partial summary | $O(LNd)$ | $O(Nd)$ | same decoder, grouped into $N$ depth blocks |
 | `parameter-golf`-style skips | current hidden state + original embedding + fixed long skips | $O(Ld)$ | $O(Ld)$ | embedding reinjection + mirrored skips |
 
 ### A simple way to think about the design space
@@ -253,7 +257,22 @@ Block AttnRes says that most of this flexibility can be kept while compressing o
 
 ---
 
-## 7. Why this matters
+## 7. What the paper shows empirically
+
+The paper’s empirical message is stronger than “here is an interesting mechanism.” Its abstract emphasizes four claims:
+
+1. the improvement is consistent across model sizes,
+2. ablations support the value of content-dependent depth-wise selection,
+3. the block variant is practical enough to serve as a drop-in replacement with minimal overhead, and
+4. integrating AttnRes into Kimi Linear improves output-magnitude and gradient uniformity across depth and improves downstream performance across evaluated tasks.
+
+The paper also reports a large-scale Kimi Linear run at 48B total parameters with 3B activated parameters, pre-trained on 1.4T tokens.
+
+That matters because it moves AttnRes out of the category of “nice small-model trick” and into the category of “something the authors actually scaled.”
+
+---
+
+## 8. Why this matters
 
 My main takeaway from the paper is not just that it proposes a new residual variant. It proposes a better way to think about residual streams.
 
@@ -269,5 +288,5 @@ That is why I find the paper interesting. Even if the final architecture that wi
 
 ## References
 
-- [Attention Residuals (Kimi Team, 2025)](https://arxiv.org/abs/2603.15031)
+- [Attention Residuals (Kimi Team, 2026)](https://arxiv.org/abs/2603.15031)
 - [parameter-golf (OpenAI)](https://github.com/openai/parameter-golf)
