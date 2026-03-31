@@ -73,11 +73,13 @@ That framing is what makes the method feel natural rather than exotic. Once you 
 
 ---
 
-## 3. A cheaper fix first: `parameter-golf`
+## 3. A cheaper fix first: embedding anchoring and long skips
 
 Before jumping to full attention over depth, it is worth looking at a cheaper family of fixes. If the problem is that useful early information gets washed out, maybe it is enough to keep a few privileged paths alive rather than letting every layer attend over the full history.
 
-That is close to what OpenAI's [parameter-golf](https://github.com/openai/parameter-golf/blob/main/train_gpt.py) code does.
+These techniques show up in OpenAI's [parameter-golf](https://github.com/openai/parameter-golf/blob/main/train_gpt.py) training code, which collects several known tricks for squeezing performance out of small GPT models.
+
+![parameter-golf/train_gpt.py](/images/post_2026_03_30_attention_residuals/parameter-golf-approach.png)
 
 ### Embedding reinjection
 
