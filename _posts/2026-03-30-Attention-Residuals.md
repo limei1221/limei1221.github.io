@@ -242,12 +242,47 @@ The token-attention backbone is unchanged by AttnRes. All complexity statements 
 
 ### Extra overhead from the residual scheme
 
-| Method | What each layer can read from depth | Extra depth-mixing compute | Extra depth-state memory | Typical structure |
-|---|---|---:|---:|---|
-| Standard residuals | only the current running hidden state | $O(Ld)$ | $O(d)$ | ordinary decoder stack |
-| Full Attention Residuals | embedding + all previous layer outputs | $O(L^2 d)$ | $O(Ld)$ | 32 decoder blocks $\approx L=64$ layers |
-| Block Attention Residuals | embedding + previous block summaries + current block partial summary | $O(LNd)$ | $O(Nd)$ | same decoder, grouped into $N$ depth blocks |
-| `parameter-golf`-style skips | current hidden state + original embedding + fixed long skips | $O(Ld)$ | $O(Ld)$ | embedding reinjection + mirrored skips |
+<table style="width:100%; border-collapse:collapse;">
+  <thead>
+    <tr style="border-bottom: 2px solid #ccc;">
+      <th style="text-align:left; padding:8px 12px;">Method</th>
+      <th style="text-align:center; padding:8px 12px;">Sources read by<br>one layer</th>
+      <th style="text-align:center; padding:8px 12px;">Per-layer cost</th>
+      <th style="text-align:center; padding:8px 12px;">Total stack cost</th>
+      <th style="text-align:center; padding:8px 12px;">Extra memory</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr style="border-bottom: 1px solid #ccc;">
+      <td style="padding:10px 12px;">Standard residuals</td>
+      <td style="text-align:center; padding:10px 12px;">$O(1)$</td>
+      <td style="text-align:center; padding:10px 12px;">$O(d)$</td>
+      <td style="text-align:center; padding:10px 12px;">$O(Ld)$</td>
+      <td style="text-align:center; padding:10px 12px;">$O(d)$</td>
+    </tr>
+    <tr style="border-bottom: 1px solid #ccc;">
+      <td style="padding:10px 12px;">Full AttnRes</td>
+      <td style="text-align:center; padding:10px 12px;">$O(l)$ at layer $l$</td>
+      <td style="text-align:center; padding:10px 12px;">$O(ld)$</td>
+      <td style="text-align:center; padding:10px 12px;">$O(L^2 d)$</td>
+      <td style="text-align:center; padding:10px 12px;">$O(Ld)$</td>
+    </tr>
+    <tr style="border-bottom: 1px solid #ccc;">
+      <td style="padding:10px 12px;">Block AttnRes</td>
+      <td style="text-align:center; padding:10px 12px;">$O(N)$</td>
+      <td style="text-align:center; padding:10px 12px;">$O(Nd)$</td>
+      <td style="text-align:center; padding:10px 12px;">$O(LNd)$</td>
+      <td style="text-align:center; padding:10px 12px;">$O(Nd)$</td>
+    </tr>
+    <tr style="border-bottom: 1px solid #ccc;">
+      <td style="padding:10px 12px;">Fixed skips</td>
+      <td style="text-align:center; padding:10px 12px;">$O(1)$</td>
+      <td style="text-align:center; padding:10px 12px;">$O(d)$</td>
+      <td style="text-align:center; padding:10px 12px;">$O(Ld)$</td>
+      <td style="text-align:center; padding:10px 12px;">$O(Ld)$</td>
+    </tr>
+  </tbody>
+</table>
 
 ### A simple way to think about the design space
 
