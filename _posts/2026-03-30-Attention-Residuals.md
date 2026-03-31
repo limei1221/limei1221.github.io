@@ -238,7 +238,7 @@ Let:
 - $L$: number of layers (each attention or MLP counts as one)
 - $N$: number of depth blocks in Block AttnRes
 
-The token-attention backbone is unchanged by AttnRes. All complexity statements below refer to the **total additional depth-mixing cost across the full depth stack**, not the cost of a single layer.
+The token-attention backbone is unchanged by AttnRes. The table below breaks out both the per-layer depth-mixing cost and the total cost summed across all $L$ layers.
 
 ### Extra overhead from the residual scheme
 
