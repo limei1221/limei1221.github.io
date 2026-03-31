@@ -25,7 +25,7 @@ One notation detail matters for the rest of the discussion. The paper counts eac
 
 ## TL;DR
 
-**Standard residuals** implicitly merge all earlier computations with equal weight. **Attention Residuals** replaces that fixed rule with learned retrieval over earlier layer outputs. The full version lets each layer attend over the entire depth history; the block version compresses old history into summaries and keeps the idea practical.
+**Standard residuals** implicitly merge all earlier computations with fixed, uniform coefficients. **Attention Residuals** replaces that fixed rule with learned retrieval over earlier layer outputs. The full version lets each layer attend over the entire depth history; the block version compresses old history into summaries and keeps the idea practical.
 
 ---
 
@@ -73,7 +73,41 @@ That framing is what makes the method feel natural rather than exotic. Once you 
 
 ---
 
-## 3. Full Attention Residuals
+## 3. A cheaper fix first: `parameter-golf`
+
+Before jumping to full attention over depth, it is worth looking at a cheaper family of fixes. If the problem is that useful early information gets washed out, maybe it is enough to keep a few privileged paths alive rather than letting every layer attend over the full history.
+
+That is close to what OpenAI's [parameter-golf](https://github.com/openai/parameter-golf/blob/main/train_gpt.py) code does.
+
+### Embedding reinjection
+
+Each block receives both the current hidden state $x$ and the original normalized token embedding $x_0$, and applies a learned channel-wise mixture:
+
+$$
+x \leftarrow a \odot x + b \odot x_0.
+$$
+
+In plain English, every block gets to decide how much of the original embedding should be reintroduced before it does more work.
+
+That gives the model a permanent lexical anchor.
+
+### Mirrored long skips
+
+The architecture also stores hidden states from the first half of the network in a `skips` list, then reuses them in reverse order in the second half, scaled by learned `skip_weights`.
+
+So instead of a pure chain, the network gets a U-Net-like depth structure with explicit long skip paths.
+
+### Why this is useful but limited
+
+This is cheap and practical. It helps preserve early information without requiring every layer to attend over the full history of depth.
+
+But the skip topology is fixed in advance. The architecture designer decides which long-range paths exist. A later layer cannot dynamically choose which earlier layers to rely on more or less for different parts of the input.
+
+That is where Attention Residuals goes further: it turns fixed skip paths into learned retrieval.
+
+---
+
+## 4. Full Attention Residuals
 
 Full Attention Residuals is the direct version of the idea.
 
@@ -132,7 +166,7 @@ That is what motivates the block version.
 
 ---
 
-## 4. Block Attention Residuals
+## 5. Block Attention Residuals
 
 Block Attention Residuals is the practical version of the idea.
 
@@ -161,7 +195,7 @@ When layer 7 runs, it does **not** need to read the outputs of layers 1, 2, 3, a
 
 - the embedding,
 - a single summary representing Block 1, and
-- the running partial accumulation inside Block 2 up to layer 6.
+- the partial block summary accumulated so far within Block 2 (up to layer 6).
 
 So the model keeps detailed access to recent depth and compressed access to older depth.
 
@@ -180,40 +214,6 @@ This is also the version that makes the idea practical in a real system. The pap
 
 ---
 
-## 5. A useful comparison: `parameter-golf`
-
-Before going too far into AttnRes, it is worth looking at a cheaper family of fixes. If the problem is that useful early information gets washed out, maybe you do not need full attention over depth. Maybe it is enough to keep a few privileged paths alive.
-
-That is close to what OpenAI’s [parameter-golf](https://github.com/openai/parameter-golf/blob/main/train_gpt.py#L700) code does.
-
-### Embedding reinjection
-
-Each block receives both the current hidden state $x$ and the original normalized token embedding $x_0$, and applies a learned channel-wise mixture:
-
-$$
-x \leftarrow a \odot x + b \odot x_0.
-$$
-
-In plain English, every block gets to decide how much of the original embedding should be reintroduced before it does more work.
-
-That gives the model a permanent lexical anchor.
-
-### Mirrored long skips
-
-The architecture also stores hidden states from the first half of the network in a `skips` list, then reuses them in reverse order in the second half, scaled by learned `skip_weights`.
-
-So instead of a pure chain, the network gets a U-Net-like depth structure with explicit long skip paths.
-
-### Why this is useful but limited
-
-This is cheap and practical. It helps preserve early information without requiring every layer to attend over the full history of depth.
-
-But the skip topology is fixed in advance. The architecture designer decides which long-range paths exist. A later layer cannot dynamically choose which earlier layers to rely on more or less for different parts of the input.
-
-That is where Attention Residuals goes further: it turns fixed skip paths into learned retrieval.
-
----
-
 ## 6. Compute and memory: what actually changes
 
 It helps to separate two different costs:
@@ -226,8 +226,6 @@ Let:
 - $T$: sequence length
 - $d$: model width
 - $L$: number of sublayers in the paper’s sense
-- $H$: number of query heads
-- $G$: number of KV heads or KV groups in GQA
 - $N$: number of depth blocks in Block AttnRes
 
 For a standard decoder with GQA, the token-attention backbone is unchanged by AttnRes. During training or prefilling, the dominant token-attention cost is still the usual quadratic attention term $O(T^2 d)$. During autoregressive decoding, per-token attention work is still linear in context length because of the KV cache. GQA changes token-attention efficiency by reducing KV storage and bandwidth; it does not change how residual information is mixed across depth.
