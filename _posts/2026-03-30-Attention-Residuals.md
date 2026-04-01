@@ -50,7 +50,7 @@ This is the hidden policy inside a residual stack: every earlier contribution is
 
 That is why residuals are not only an optimization trick. They are also a specific rule for mixing information across depth.
 
-The paper’s motivation is that this rule is too rigid. Different layers may want different mixtures of earlier computation. An attention layer may benefit from access to a representation that still preserves token identity. An MLP layer may prefer a later semantic abstraction. Standard residuals force both to consume the same compressed state.
+The paper’s motivation is that this rule is too rigid. (1) Every layer receives the same aggregated state $h_{l-1}$ regardless of what it needs, so different sublayer types (attention vs. MLP) cannot selectively weight earlier contributions. (2) Information lost through that uniform aggregation is gone for good: no deeper layer can reach back and recover it. (3) Because each new output must compete with the accumulated sum of all preceding layers, later layers are pressured to produce increasingly large outputs just to have influence, which can destabilize training.
 
 A useful mental model is the analogy to sequence modeling. Recurrence compresses token history into one running state; self-attention replaces that compression with retrieval over earlier tokens. Attention Residuals makes a similar conceptual move over **depth** rather than **time**.
 
@@ -139,7 +139,7 @@ $$
 q_l = w_l \in \mathbb{R}^d, \qquad k_i = v_i,
 $$
 
-and output
+where the query $q_l = w_l$ is a layer-specific learnable vector and output
 
 $$
 h_l = \sum_{i=0}^{l-1} \alpha_{i \to l} v_i.
@@ -238,6 +238,7 @@ Let:
 - $d$: model width
 - $L$: number of layers (each attention or MLP counts as one)
 - $N$: number of depth blocks in Block AttnRes
+- $S = L/N$: layers per block
 
 The token-attention backbone is unchanged by AttnRes. The table below breaks out both the per-layer depth-mixing cost and the total cost summed across all $L$ layers.
 
@@ -271,8 +272,8 @@ The token-attention backbone is unchanged by AttnRes. The table below breaks out
     <tr style="border-bottom: 1px solid #ccc;">
       <td style="padding:10px 12px;">Block AttnRes</td>
       <td style="text-align:center; padding:10px 12px;">$O(N)$</td>
-      <td style="text-align:center; padding:10px 12px;">$O(Nd)$</td>
-      <td style="text-align:center; padding:10px 12px;">$O(LNd)$</td>
+      <td style="text-align:center; padding:10px 12px;">$O(Nd/S)$</td>
+      <td style="text-align:center; padding:10px 12px;">$O(N^2 d)$</td>
       <td style="text-align:center; padding:10px 12px;">$O(Nd)$</td>
     </tr>
     <tr style="border-bottom: 1px solid #ccc;">
