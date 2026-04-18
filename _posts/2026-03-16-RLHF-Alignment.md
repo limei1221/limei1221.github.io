@@ -2,7 +2,7 @@
 layout: post
 comments: true
 mathjax: true
-title: "From PPO to GRPO: The Evolution of Alignment Algorithms in Large Language Models"
+title: "From PPO to DPO to GRPO: How LLM Alignment Got Leaner"
 excerpt: "An exploration of LLM alignment techniques — from RLHF with PPO to the more efficient DPO and GRPO — explaining the mathematical intuition behind each method and why the field moved beyond PPO-based pipelines."
 date: 2026-03-16
 ---
@@ -29,7 +29,7 @@ RLHF usually refers to a post-training pipeline for aligning a pretrained langua
 
 This is the broad pipeline popularized by **InstructGPT** [[Ouyang et al., 2022]](https://arxiv.org/abs/2203.02155). The figure below (Figure 2 from the InstructGPT paper) illustrates the three steps concretely:
 
-![Figure 2 from the InstructGPT paper, showing the three-step RLHF pipeline: (1) supervised fine-tuning, (2) reward model training, and (3) PPO-based reinforcement learning.](/images/post_2026_03_16_llm_alignment/instructgpt_fig2.png)
+![Figure 2 from the InstructGPT paper, showing the three-step RLHF pipeline: (1) supervised fine-tuning, (2) reward model training, and (3) PPO-based reinforcement learning.](/images/post_2026_03_16_rlhf_alignment/InstructGPT_fig2.png)
 *Figure 2 from Ouyang et al. (2022): A diagram illustrating the three steps of InstructGPT — (1) supervised fine-tuning (SFT), (2) reward model training, and (3) reinforcement learning via PPO.*
 
 In practice, some people use the term "RLHF" more narrowly to refer only to the reward-modeling and RL stages. In this post, we will use the broader definition, because it makes it easier to compare PPO, DPO, and GRPO within one shared framework, even though DPO skips parts of the classic pipeline.
@@ -97,6 +97,8 @@ where $R_t$ is the discounted return starting from time step $t$, meaning the to
 
 In practice, many implementations use multi-step returns or Generalized Advantage Estimation (GAE), but this expression captures the core idea: compare what actually happened with what the critic predicted.
 
+Why subtract a baseline at all? Raw reward mixes two very different things: how hard the prompt or state was, and how good the sampled action actually was. The advantage removes a baseline expected reward for that context, so the policy learns from whether an action was better or worse than expected, not just whether the final score was high. That reduces gradient variance, improves credit assignment, and avoids over-reinforcing actions that only looked good because the prompt was easy. And the correction is essentially free: as long as the baseline depends only on the state and not on the sampled action, subtracting it does not change the expected gradient direction — its contribution cancels out in expectation.
+
 PPO then optimizes, more precisely **maximizes**, the clipped surrogate objective $J^{\text{CLIP}}(\theta)$:
 
 $$
@@ -118,7 +120,6 @@ is the probability ratio between the new policy and the old one.
 Here, in the generic RL notation, $s_t$ is the state at time step $t$ and $a_t$ is the action taken; for language models, this corresponds to $(q, o_{<t})$ as the state (prompt plus all tokens generated so far) and $o_t$ as the token chosen at that step.
 The policy $\pi_{\theta_{\text{old}}}$ is the policy that generated the current batch of trajectories, and we keep it fixed while we optimize the new policy $\pi_\theta$.
 
-
 If an action has positive advantage, PPO wants to make it more likely. But the clipping term prevents the probability ratio from moving too far in a single update. That clipping is the main stabilizing mechanism.
 
 ### Where the KL Penalty Comes In
@@ -139,7 +140,7 @@ Conceptually, the pipeline works like this:
 2. Turn that scalar reward into returns $R_t$ and advantages $\hat{A}_t$ along the trajectory.
 3. Use those advantages inside the PPO objective to update the policy.
 
-### Why PPO Was So Important — and Why It’s Expensive
+### Why PPO Was So Important — and Why It's Expensive
 
 PPO mattered because it gave practitioners a workable way to train language models with reward signals rather than pure imitation. That was a major step beyond supervised fine-tuning.
 
@@ -198,6 +199,36 @@ The interpretation is straightforward: the model is pushed to assign relatively 
 
 In practice, many implementations write this as **minimizing a loss** $L_{\text{DPO}} = -J_{\text{DPO}}$, but that is mathematically equivalent to the maximization form above.
 
+### Why This Works: The "Secret Reward Model"
+
+The DPO objective can look like it came out of nowhere. It is actually a direct consequence of a simple mathematical identity hidden inside the standard RLHF objective. The derivation has three steps.
+
+**Step 1: The RLHF objective has a closed-form optimum.** PPO's goal is to maximize reward while staying close to a reference model, with the tradeoff controlled by a parameter $\beta$:
+
+$$
+\max_{\pi}\; \mathbb{E}_{o\sim\pi}[r(q,o)] \;-\; \beta\, D_{\mathrm{KL}}(\pi \,\|\, \pi_{ref}).
+$$
+
+This problem has a clean closed-form optimum:
+
+$$
+\pi^*(o\mid q) \;\propto\; \pi_{ref}(o\mid q)\,\exp\!\left(\tfrac{1}{\beta}\, r(q,o)\right).
+$$
+
+In plain words: the best policy is just the reference model, reweighted by how much the reward likes each response.
+
+**Step 2: Flip the relationship.** Because the best policy is fully determined by the reward, we can run the derivation the other way — solving for the reward in terms of the policy:
+
+$$
+r(q,o) \;=\; \beta \log \frac{\pi^*(o\mid q)}{\pi_{ref}(o\mid q)} \;+\; C(q),
+$$
+
+where $C(q)$ is a term that depends on the prompt but not on the response. The important takeaway: **every policy implicitly defines a reward function** — namely, its own log-ratio against the reference model.
+
+**Step 3: Preferences only see reward *differences*.** The Bradley-Terry preference model says the probability that $o_w$ is preferred over $o_l$ depends on the difference $r(q,o_w) - r(q,o_l)$. When we take that difference, the prompt-dependent term $C(q)$ cancels — both responses share the same prompt. What remains is an expression involving only $\pi_\theta$ and $\pi_{ref}$, and that is exactly the DPO objective.
+
+This is what makes the title of the paper literal: every policy carries around an implicit reward model (the log-ratio to the reference). DPO trains the policy so that *its own* implicit reward agrees with the preference data. That is also why DPO is still preference optimization and not SFT — the gradient is driven by the *difference* between $o_w$ and $o_l$ scores, not by imitating $o_w$ in isolation.
+
 ### Why DPO Took Off
 
 DPO is attractive because it removes much of PPO's infrastructure burden. There is no explicit value model, no rollout-based RL loop, and no need to first train a separate reward model for this stage.
@@ -229,6 +260,9 @@ GRPO emerged from the observation that reinforcement learning is still extremely
 So the question was not whether RL still mattered. The question was whether we could keep much of PPO's benefit **without** carrying around a separate critic.
 
 GRPO's answer is: yes.
+
+![Figure 4 from the DeepSeekMath paper, comparing PPO and GRPO. PPO uses a value model to estimate advantages via GAE, while GRPO drops the value model and instead computes advantages by comparing a group of sampled outputs for the same prompt.](/images/post_2026_03_16_rlhf_alignment/DeepSeekMath_fig4.png)
+*Figure 4 from Shao et al. (2024): Comparison between PPO and GRPO. GRPO replaces the value model with a group-relative baseline computed from multiple sampled outputs, removing the need for a separate critic.*
 
 ### The Core Idea
 
@@ -264,12 +298,16 @@ $$
 \hat{A}_i = \frac{r_i - \mathrm{mean}(r)}{\mathrm{std}(r)}
 $$
 
+Under outcome supervision, this single scalar $\hat{A}_i$ is broadcast to every token in $o_i$: every position $t$ in the $i$-th sampled sequence shares the same advantage. (Process supervision, discussed later, relaxes this.)
+
 The interpretation is intuitive:
 
 * if a sampled answer is better than the average answer in its group, it gets positive advantage;
 * if it is worse, it gets negative advantage.
 
 So GRPO no longer needs a separate learned value function to estimate what was "better than expected." The group itself provides the baseline.
+
+Why does this help? Raw reward alone still mixes prompt difficulty with completion quality. Group-relative comparison asks, for *this same prompt*, which completion was better than the others — which cancels out much of the prompt-level difficulty bias without needing a learned critic. One edge case is worth flagging: if every completion in a group gets nearly identical rewards, the relative advantages collapse toward zero, and that group produces almost no learning signal. In practice, this tends to happen on prompts that are either too easy (every sample is correct) or too hard (every sample fails) for the current policy.
 
 ### The Math
 
@@ -336,7 +374,7 @@ $$
 \frac{1}{|o_i|}
 $$
 
-means the objective includes **length normalization** over each sampled sequence. That is part of the original GRPO formulation and is easy to overlook.
+means the objective includes **length normalization** over each sampled sequence. That is part of the original GRPO formulation and is easy to overlook. More recent work (e.g., DAPO and Dr. GRPO) has argued that this per-sequence normalization introduces a length bias in the gradient, and proposes alternative normalizations — worth keeping in mind if you plan to implement GRPO in practice.
 
 Second, the expression above corresponds to the simplest **outcome-supervision** setting, where each whole response gets one reward and therefore one sequence-level advantage.
 
@@ -365,9 +403,9 @@ It would be too strong to say that RL is universally superior for reasoning. But
 
 ---
 
-## Putting the Three Together
+## Summary
 
-At a high level, these methods reflect three different philosophies of post-training.
+At a high level, these three methods reflect different philosophies of post-training.
 
 ### PPO: Full RL with Explicit Value Estimation
 
@@ -381,14 +419,60 @@ DPO says: if your main resource is a good offline preference dataset, maybe you 
 
 GRPO says: if you still want exploration and rollout-based learning, you may be able to remove the value model and replace it with a group-relative baseline. That preserves much of the RL flavor while reducing some of PPO's cost.
 
----
+### At a Glance
 
-## Summary
-
-* **RLHF** is the broad post-training framework for aligning language models using human preferences or related reward signals.
-* **PPO** is the classic RLHF workhorse: powerful, but heavy because it often involves policy, reference, reward, and value components.
-* **DPO** turns preference optimization into a direct pairwise objective, avoiding an explicit RL loop.
-* **GRPO** is a critic-free RL method that estimates advantage relative to a group of sampled outputs, while still relying on reward signals such as reward models or verifiers.
+<table style="border-collapse: collapse; width: 100%;">
+  <thead>
+    <tr>
+      <th style="border: 1px solid #ccc; padding: 8px; text-align: center;">Category</th>
+      <th style="border: 1px solid #ccc; padding: 8px;">Property</th>
+      <th style="border: 1px solid #ccc; padding: 8px; text-align: center;">PPO</th>
+      <th style="border: 1px solid #ccc; padding: 8px; text-align: center;">DPO</th>
+      <th style="border: 1px solid #ccc; padding: 8px; text-align: center;">GRPO</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td rowspan="2" style="border: 1px solid #ccc; padding: 8px; text-align: center; vertical-align: middle;"><strong>Architecture</strong></td>
+      <td style="border: 1px solid #ccc; padding: 8px;">Value model / critic</td>
+      <td style="border: 1px solid #ccc; padding: 8px; text-align: center;">Required</td>
+      <td style="border: 1px solid #ccc; padding: 8px; text-align: center;">Not used</td>
+      <td style="border: 1px solid #ccc; padding: 8px; text-align: center;">Not used</td>
+    </tr>
+    <tr>
+      <td style="border: 1px solid #ccc; padding: 8px;">KL to reference</td>
+      <td style="border: 1px solid #ccc; padding: 8px; text-align: center;">Yes (per-token or reward-shaped)</td>
+      <td style="border: 1px solid #ccc; padding: 8px; text-align: center;">Yes (inside the sigmoid)</td>
+      <td style="border: 1px solid #ccc; padding: 8px; text-align: center;">Yes (added to objective)</td>
+    </tr>
+    <tr>
+      <td rowspan="2" style="border: 1px solid #ccc; padding: 8px; text-align: center; vertical-align: middle;"><strong>Process</strong></td>
+      <td style="border: 1px solid #ccc; padding: 8px;">Online rollouts</td>
+      <td style="border: 1px solid #ccc; padding: 8px; text-align: center;">Yes</td>
+      <td style="border: 1px solid #ccc; padding: 8px; text-align: center;">No (offline only)</td>
+      <td style="border: 1px solid #ccc; padding: 8px; text-align: center;">Yes</td>
+    </tr>
+    <tr>
+      <td style="border: 1px solid #ccc; padding: 8px;">Supports exploration</td>
+      <td style="border: 1px solid #ccc; padding: 8px; text-align: center;">Yes</td>
+      <td style="border: 1px solid #ccc; padding: 8px; text-align: center;">No</td>
+      <td style="border: 1px solid #ccc; padding: 8px; text-align: center;">Yes</td>
+    </tr>
+    <tr>
+      <td rowspan="2" style="border: 1px solid #ccc; padding: 8px; text-align: center; vertical-align: middle;"><strong>Supervision</strong></td>
+      <td style="border: 1px solid #ccc; padding: 8px;">Reward signal</td>
+      <td style="border: 1px solid #ccc; padding: 8px; text-align: center;">Learned reward model</td>
+      <td style="border: 1px solid #ccc; padding: 8px; text-align: center;">Implicit (from preferences)</td>
+      <td style="border: 1px solid #ccc; padding: 8px; text-align: center;">Reward model or verifier</td>
+    </tr>
+    <tr>
+      <td style="border: 1px solid #ccc; padding: 8px;">Preference pairs</td>
+      <td style="border: 1px solid #ccc; padding: 8px; text-align: center;">Used to train the RM</td>
+      <td style="border: 1px solid #ccc; padding: 8px; text-align: center;">Used directly in the loss</td>
+      <td style="border: 1px solid #ccc; padding: 8px; text-align: center;">Not required</td>
+    </tr>
+  </tbody>
+</table>
 
 The shift from PPO toward methods like DPO and GRPO reflects a broader pattern in AI: not abandoning alignment or reinforcement learning, but **re-engineering them to be cheaper, more stable, and better matched to the structure of the task**.
 
