@@ -4,7 +4,7 @@ comments: true
 mathjax: true
 title: "Entropy, Cross-Entropy, and KL Divergence Explained"
 excerpt: "A practical explanation of entropy, cross-entropy, and KL divergence: what each quantity means, how to write the formulas, and why they show up together so often in machine learning."
-date: 2026-04-18
+date: 2026-03-12
 ---
 
 Three related but distinct quantities keep appearing together in information theory and machine learning:
