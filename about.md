@@ -7,8 +7,7 @@ includelink: true
 
 I’m a Machine Learning Engineer with 7+ years of experience, previously at Alibaba and Mobvoi. I’m currently focused on LLM inference optimization and reinforcement learning for post-training through open-source work.
 
-[LinkedIn](https://www.linkedin.com/in/limei1221/) / [Github](https://github.com/limei1221)
-<!-- [YouTube](https://www.youtube.com/@meili-ai) -->
+[LinkedIn](https://www.linkedin.com/in/limei1221/) / [Github](https://github.com/limei1221) / [YouTube](https://www.youtube.com/@meili-ai)
 
 How I work and learn
 
