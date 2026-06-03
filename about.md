@@ -12,8 +12,8 @@ I’m a Machine Learning Engineer with 7+ years of experience, previously at Ali
 How I work and learn
 
 - Quality over quantity. I’d rather build a few things deeply than many things superficially.
-- Read-and-run is not learning. I try to understand systems by rebuilding, tracing, and explaining them from scratch.
-- The blank page test. After reading a paper or studying a system, I close everything and write the core idea from scratch. If I get stuck, that’s the gap I need to fix.
+- Read-and-run is not learning. I try to understand systems by rebuilding and tracing them from scratch.
+- Teaching forces clarity. I make YouTube videos explaining a concept from motivation to the math (and maybe the implementation in the future) to find out whether I actually understand it. Just started :)
 
 <img src="/images/avatar_half.jpg" alt="Mei Li" style="width: 400px;" /> 
 
