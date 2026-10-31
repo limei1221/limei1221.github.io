@@ -17,7 +17,7 @@ Ruby and the Jekyll gem must be installed. There is no Gemfile — install Jekyl
 
 ## Architecture
 
-**Content** lives in `_posts/` as `YYYY-MM-DD-title.markdown` files. Each post begins with YAML front matter:
+**Content** lives in `_posts/` as `YYYY-MM-DD-title.md` files. Each post begins with YAML front matter:
 
 ```yaml
 ---
@@ -38,4 +38,4 @@ excerpt: "Short summary shown in post listings"
 
 **Site config** is `_config.yml`. Markdown processor is kramdown with GFM input and Rouge syntax highlighting. URLs use `permalink: pretty` (e.g., `/2024/01/01/post-title/`).
 
-**Assets** go in `assets/<post-name>/`. The `_site/` and `_drafts/` directories are gitignored.
+**Post images** go in `images/post_YYYY_MM_DD_topic/`. The `_site/` and `_drafts/` directories are gitignored.
