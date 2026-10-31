@@ -3,9 +3,11 @@ layout: post
 comments: true
 mathjax: true
 title: "Optimizers in Deep Learning"
-excerpt: ""
+excerpt: "How common deep learning optimizers update parameters: SGD, momentum, Adagrad, RMSProp, Adam, AdamW, and Muon."
 date: 2026-08-02
 ---
+
+An optimizer decides how to update a model's parameters from their gradients. This post covers SGD, momentum, Adagrad, RMSProp, Adam, AdamW, and Muon.
 
 Assume a vector of parameters `x` and the gradient `dx`.
 
@@ -62,7 +64,7 @@ x += -learning_rate * mt / (np.sqrt(vt) + eps)
 ## AdamW
 [Decoupled Weight Decay Regularization](https://arxiv.org/abs/1711.05101)
 
-AdamW separate weight decay from Adam.
+AdamW separates weight decay from Adam.
 ```
 class AdamW(torch.optim.Optimizer):
     def __init__(self, params, lr, betas, eps, weight_decay):
@@ -105,20 +107,22 @@ class AdamW(torch.optim.Optimizer):
                 state["v"] = v
 ```
 * No L2-term in loss function.
-* Usually we don’t want weight decay on biases and LayerNorm params:
+* Usually we don't want weight decay on biases and LayerNorm params:
 ```
 torch.optim.AdamW([
     {'params': decay_params, 'weight_decay': 0.01},
     {'params': no_decay_params, 'weight_decay': 0.0},
 ])
 ```
-* In practice it’s better to apply weight decay before the Adam update because weight decay depends on the parameter.
+* In practice it's better to apply weight decay before the Adam update because weight decay depends on the parameter.
 
 ## Muon
 [Muon: An optimizer for hidden layers in neural networks](https://kellerjordan.github.io/posts/muon/)
 
 Muon is an optimizer for 2D parameters of neural network hidden layers. It is defined as follows:
 ![Muon Algorithm](/images/post_2026_08_02_optimizers/muon_algo.png)
+*The Muon update. Source: [Jordan et al. 2024](https://kellerjordan.github.io/posts/muon/)*
+
 When training a neural network with Muon, scalar and vector parameters of the network, as well as the input and output layers, should be optimized by a standard method such as AdamW.
 
 ### Newton-Schulz
@@ -137,4 +141,12 @@ Ortho(B_t) = UV^{\mathrm{T}} \in \mathbb{R}^{m \times n},
 $$
 whose singular values are $diag(1,1,1,1,1,...)$. So instead of spending almost the entire update on one dominant direction, Muon makes a substantial update along every useful singular direction simultaneously.
 
-And Newton-Schulz is just an efficient way of approximately computing this $UV^{\mathrm{T}}$ without explicitly performing an SVD. In practice Muon runs the iteration on the normalized momentum $B_t / \lVert B_t \rVert_F$, and the quintic coefficients are deliberately tuned *not* to converge exactly — the resulting singular values land roughly in $[0.7, 1.3]$ rather than exactly $1$, which turns out to be good enough.
+And Newton-Schulz is just an efficient way of approximately computing this $UV^{\mathrm{T}}$ without explicitly performing an SVD. In practice Muon runs the iteration on the normalized momentum $B_t / \lVert B_t \rVert_F$, and the quintic coefficients are deliberately tuned *not* to converge exactly, and the resulting singular values land roughly in $[0.7, 1.3]$ rather than exactly $1$, which turns out to be good enough.
+
+
+## References
+1. Duchi et al. "[Adaptive Subgradient Methods for Online Learning and Stochastic Optimization](https://jmlr.org/papers/v12/duchi11a.html)." JMLR 2011.
+2. Hinton et al. "[Lecture 6 slides](https://www.cs.toronto.edu/~tijmen/csc321/slides/lecture_slides_lec6.pdf)." CSC321.
+3. Kingma and Ba. "[Adam: A Method for Stochastic Optimization](https://arxiv.org/abs/1412.6980)." ICLR 2015.
+4. Loshchilov and Hutter. "[Decoupled Weight Decay Regularization](https://arxiv.org/abs/1711.05101)." ICLR 2019.
+5. Jordan et al. "[Muon: An optimizer for hidden layers in neural networks](https://kellerjordan.github.io/posts/muon/)." Blog 2024.

@@ -7,12 +7,12 @@ excerpt: "Speculative Decoding is a latency reduction technique for LLM inferenc
 date: 2025-08-18
 ---
 
-Speculative Decoding is a latency reduction technique for large language model (LLM) inference.
+Speculative Decoding ([Leviathan et al. 2023](https://arxiv.org/abs/2211.17192)) is a latency reduction technique for large language model (LLM) inference.
 Instead of letting the big model (the target model) generate each token sequentially, we first use a smaller, faster draft model to propose multiple candidate tokens ahead of time. Then the large model verifies these proposals in parallel, significantly reducing the number of expensive forward passes.
 
 
 ## Background
-Inference from large autoregressive models like Transformers is slow — decoding $K$ tokens takes $K$ serial runs of the model.
+Inference from large autoregressive models like Transformers is slow, since decoding $K$ tokens takes $K$ serial runs of the model.
 
 Key observations:
 * Some inference steps are "harder" and some are "easier".
@@ -23,7 +23,7 @@ Key observations:
 * Inference from large models is often not bottlenecked by arithmetic operations, but rather by memory bandwidth and communication.
 
 
-## Speculative Decoding
+## Speculative decoding
 Let $M_p$ be the target model, inference from which we're trying to accelerate, $M_q$ be a more efficient draft model.
 
 The core idea is to:
@@ -33,10 +33,10 @@ The core idea is to:
 
 This way, each parallel run of the target model $M_p$ will produce at least one new token, but it can potentially generate many new tokens, up to $\gamma + 1$, depending on how well $M_q$ approximates $M_p$.
 
-## Speculative Sampling
+## Speculative sampling
 To sample $x \sim p(x)$, we instead sample $x \sim q(x)$, keeping it if $q(x) \leq p(x)$, and in case $q(x) > p(x)$ we reject the sample with probability $1 - \frac{p(x)}{q(x)}$ and sample $x$ again from an adjusted distribution $p'(x) = \mathrm{norm}(\max(0, p(x) - q(x)))$.
 
-It can be proven (see Appendix A.1 of the paper <a href="https://arxiv.org/abs/2211.17192">Fast Inference from Transformers via Speculative Decoding</a>) that for any distributions $p(x)$ and $q(x)$, and $x$ sampled in this way, indeed $x \\sim p(x)$.
+It can be proven (see Appendix A.1 of the paper <a href="https://arxiv.org/abs/2211.17192">Fast Inference from Transformers via Speculative Decoding</a>) that for any distributions $p(x)$ and $q(x)$, and $x$ sampled in this way, indeed $x \sim p(x)$.
 
 <figure>
   <img src="/images/post_2025_08_18_speculative_decoding/speculative_decoding_algo.png" alt="Speculative decoding algorithm diagram">
@@ -45,5 +45,5 @@ It can be proven (see Appendix A.1 of the paper <a href="https://arxiv.org/abs/2
 
 
 ## References
-- [Fast Inference from Transformers via Speculative Decoding](https://arxiv.org/abs/2211.17192)
-- [Speculative Decoding — Make LLM Inference Faster](https://medium.com/ai-science/speculative-decoding-make-llm-inference-faster-c004501af120)
+1. Leviathan et al. "[Fast Inference from Transformers via Speculative Decoding](https://arxiv.org/abs/2211.17192)." ICML 2023.
+2. "[Speculative Decoding — Make LLM Inference Faster](https://medium.com/ai-science/speculative-decoding-make-llm-inference-faster-c004501af120)." Medium.

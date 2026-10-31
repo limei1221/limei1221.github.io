@@ -9,9 +9,9 @@ date: 2026-03-12
 
 Three related but distinct quantities keep appearing together in information theory and machine learning:
 
-* **Entropy** — uncertainty in a distribution.
-* **Cross-entropy** — cost of describing data from $P$ using $Q$.
-* **KL divergence** — the gap between the two.
+* **Entropy** is the uncertainty in a distribution.
+* **Cross-entropy** is the cost of describing data from $P$ using $Q$.
+* **KL divergence** is the gap between the two.
 
 ---
 
@@ -37,7 +37,7 @@ $$
 H(P) = - \sum_{x} P(x) \log P(x) = \mathbb{E}_{x \sim P}[-\log P(x)]
 $$
 
-Entropy is the expected surprise of samples from $P$ — a property of **one** distribution.
+Entropy is the expected surprise of samples from $P$. It is a property of **one** distribution.
 
 * Concentrated $P$ → low entropy (a coin that always shows heads has $H=0$).
 * Spread-out $P$ → high entropy. A fair coin gives
@@ -46,13 +46,13 @@ $$
 H = -\tfrac{1}{2}\log_2\tfrac{1}{2} - \tfrac{1}{2}\log_2\tfrac{1}{2} = 1 \text{ bit},
 $$
 
-which is the maximum over two outcomes. More generally, entropy over $n$ outcomes is maximized by the uniform distribution at $\log_2 n$ bits — uniform means maximally uncertain.
+which is the maximum over two outcomes. More generally, entropy over $n$ outcomes is maximized by the uniform distribution at $\log_2 n$ bits, because uniform means maximally uncertain.
 
 **Coding interpretation:** $H(P)$ is the optimal average code length for outcomes from $P$, i.e. the compression limit.
 
 ---
 
-## 2. Cross-Entropy
+## 2. Cross-entropy
 
 $$
 H(P, Q) = - \sum_{x} P(x) \log Q(x) = \mathbb{E}_{x \sim P}[-\log Q(x)]
@@ -70,7 +70,7 @@ so minimizing it pushes probability mass onto the correct class.
 
 ---
 
-## 3. KL Divergence
+## 3. KL divergence
 
 $$
 D_{\mathrm{KL}}(P \,\|\, Q)
@@ -89,12 +89,12 @@ since $\mathbb{E}_{x \sim P}[r(x)] = \sum_x Q(x) = 1$.
 **Key properties:**
 
 * $D_{\mathrm{KL}}(P \,\|\, Q) \ge 0$, with equality if and only if $P(x) = Q(x)$ for all $x$. This follows from Jensen's inequality: $-\mathbb{E}_P[\log(Q/P)] \ge -\log \mathbb{E}_P[Q/P] = -\log 1 = 0$.
-* Not symmetric: $D_{\mathrm{KL}}(P \,\|\, Q) \ne D_{\mathrm{KL}}(Q \,\|\, P)$ in general — it is not a metric.
+* Not symmetric: $D_{\mathrm{KL}}(P \,\|\, Q) \ne D_{\mathrm{KL}}(Q \,\|\, P)$ in general, so it is not a metric.
 * If $P(x) > 0$ but $Q(x) = 0$ for some $x$, both $D_{\mathrm{KL}}$ and $H(P,Q)$ diverge.
 
 ---
 
-## 4. The Core Identity
+## 4. The core identity
 
 $$
 H(P, Q) = H(P) + D_{\mathrm{KL}}(P \,\|\, Q)
@@ -127,15 +127,15 @@ That is why cross-entropy is the natural classification loss: minimizing it driv
 
 ---
 
-## 5. Where They Show Up
+## 5. Where they show up
 
 * **Classification:** cross-entropy loss penalizes low probability on the true class.
 * **Maximum likelihood:** minimizing empirical cross-entropy = maximizing log-likelihood.
-* **Distribution matching:** variational inference, knowledge distillation, RL regularization, generative modeling — all use KL, and the direction ($P\|Q$ vs $Q\|P$) encodes different behaviors.
+* **Distribution matching:** variational inference, knowledge distillation, RL regularization, and generative modeling all use KL, and the direction ($P\|Q$ vs $Q\|P$) encodes different behaviors.
 
 ---
 
-## 6. Summary
+## 6. Formula summary
 
 $$
 H(P) = -\sum_x P(x)\log P(x)

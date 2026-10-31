@@ -3,13 +3,13 @@ layout: post
 comments: true
 mathjax: true
 title: "Derivatives, Gradients, and Jacobians Explained"
-excerpt: "A concise breakdown of derivatives, gradients, and Jacobians — three names for the same core concept of measuring how a function's output changes with its input, differing only in the dimensionality of the function."
+excerpt: "A concise breakdown of derivatives, gradients, and Jacobians: three names for the same core concept of measuring how a function's output changes with its input, differing only in the dimensionality of the function."
 date: 2025-07-06
 ---
 
 All three of these terms represent the core concept of a **derivative**: measuring how a function's output changes as its input changes. The difference between them simply depends on the *dimensions* of the function's input and output.
 
-Here’s the simple breakdown:
+Here's the simple breakdown:
 
 * **Derivative:** For functions with **one input** and **one output**. (Scalar $\to$ Scalar)
 * **Gradient:** For functions with **multiple inputs** and **one output**. (Vector $\to$ Scalar)
@@ -17,7 +17,7 @@ Here’s the simple breakdown:
 
 ---
 
-## 1. The Derivative
+## 1. The derivative
 
 This is the classic derivative you learn first in calculus.
 
@@ -33,7 +33,7 @@ This is the classic derivative you learn first in calculus.
 
 ---
 
-## 2. The Gradient
+## 2. The gradient
 
 The gradient generalizes the derivative to functions that have multiple input variables but still produce a single output.
 
@@ -73,4 +73,4 @@ The Jacobian is the most general form of the three. It handles functions that ha
 * **How it's built:** It's a matrix where each *row* is the gradient (transposed) of one of the output functions.
     * For a function $\mathbf{f}(x, y) = \begin{pmatrix} f_1(x, y) \\ f_2(x, y) \end{pmatrix}$, the $2 \times 2$ Jacobian matrix is:
         $$J = \begin{pmatrix} \frac{\partial f_1}{\partial x} & \frac{\partial f_1}{\partial y} \\ \frac{\partial f_2}{\partial x} & \frac{\partial f_2}{\partial y} \end{pmatrix} = \begin{pmatrix} \nabla f_1^T \\ \nabla f_2^T \end{pmatrix}$$
-* **Key Application:** Its determinant (the "Jacobian determinant") is crucial for **changing variables in multidimensional integrals** (like converting from Cartesian $(x,y)$ to polar $(r, \theta)$ coordinates).
+* **Key Application:** Its determinant (the "Jacobian determinant") is used for **changing variables in multidimensional integrals** (like converting from Cartesian $(x,y)$ to polar $(r, \theta)$ coordinates).
