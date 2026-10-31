@@ -227,6 +227,22 @@ A request moves through the system in four steps:
 
 Long prefills can no longer stall decodes. Each pool can also use different hardware, since prefill wants compute and decode wants memory bandwidth and capacity, and each can be scaled for its own latency target.
 
+Fewer stalls may not be the main benefit. [Zhang (2026)](https://x.com/ekzhang1/status/2105444878716932411) argues that tail ITL is a weak reason to disaggregate, because users feel the time for a whole response of hundreds or thousands of tokens, not one slow token. Zhang's steady-state model shows that disaggregation lowers mean TPOT while keeping the same batch size and throughput.
+
+Take four regular workers under enough traffic that each spends 75% of its time on prefill and 25% on decode. If a decode step takes 10 ms, a running sequence gets a token only every 40 ms, because its worker decodes a quarter of the time.
+
+![Four regular workers](/images/post_2026_10_30_llm_inference/disagg_regular_workers.png)
+*Four regular workers, each spending 75% of its time on prefill and 25% on decode. Source: [Zhang 2026](https://x.com/ekzhang1/status/2105444878716932411)*
+
+Now split them into three prefill workers and one decode worker. Prefill takes the same total time. The decode worker handles four times as many requests, each finishing four times faster, so it runs the same batch size at the same throughput. A decode step still takes 10 ms, but TPOT falls from 40 ms to 10 ms.
+
+![Three prefill workers and one decode worker](/images/post_2026_10_30_llm_inference/disagg_split_workers.png)
+*The same load split across three prefill workers and one decode worker. Source: [Zhang 2026](https://x.com/ekzhang1/status/2105444878716932411)*
+
+In general, the speedup is $1 / f_{\text{decode}}$, where $f_{\text{decode}}$ is the share of time a regular worker spends on decode. That gives 2x for a 1:1 prefill-to-decode split and 1.25x for a 1:4 split. So the gain is largest for prefill-heavy workloads, and Zhang concludes that decode-bound, low-latency inference does not need disaggregation. Zhang reports validating this on production workloads, without publishing the measurements.
+
+The model assumes perfect scheduling on the regular workers and a network that isn't the bottleneck. It leaves out chunked prefill, which Zhang notes is incompatible with speculative decoding in most engines. Disaggregation can also leave less HBM for prefix caches when prefill takes under 50% of the time, which Zhang says tiered caches and Mooncake largely mitigate.
+
 Three systems explore this design. Splitwise ([Patel et al. 2023](https://arxiv.org/abs/2311.18677)) splits the phases across machines and tunes hardware for each, reporting up to 1.4x throughput at 20% lower cost. DistServe ([Zhong et al. 2024](https://arxiv.org/abs/2401.09670)) chooses resources and parallelism per phase under TTFT and TPOT targets, reporting 7.4x more requests or a 12.6x tighter SLO. Mooncake ([Qin et al. 2024](https://arxiv.org/abs/2407.00079)) adds a shared KV cache across CPU, DRAM and SSD. It serves Kimi and reports 75% more requests on real workloads. These results use different baselines, so don't compare them directly.
 
 The main cost is moving the cache. Sending 1 GiB over a 200 Gb/s link takes about 43 ms, and that delay lands between the first and second token, so long prompts need fast networks. The right ratio of prefill to decode workers also shifts with the workload, and there are more components that can fail.
@@ -323,3 +339,4 @@ Each technique above maps to a metric from Section 1.2, so diagnosis starts from
 28. Lin et al. "[AWQ: Activation-aware Weight Quantization for LLM Compression and Acceleration](https://arxiv.org/abs/2306.00978)." MLSys 2024.
 29. Dao et al. "[Flash-Decoding for long-context inference](https://pytorch.org/blog/flash-decoding/)." PyTorch Blog 2023.
 30. Wu et al. "[Fast Distributed Inference Serving for Large Language Models](https://arxiv.org/abs/2305.05920)." arXiv 2023.
+31. Zhang. "[Analysis of PD disaggregation](https://x.com/ekzhang1/status/2105444878716932411)." X 2026.
